@@ -1,0 +1,20 @@
+<svg width="500" height="350" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  
+  <rect x="50" y="30" width="400" height="290" rx="8" fill="#eceff1" stroke="#607d8b" stroke-width="2" />
+  <text x="250" y="60" font-family="sans-serif" font-size="18" font-weight="bold" text-anchor="middle">EvalResult JSON Schema</text>
+
+  <text x="70" y="100" font-family="monospace" font-size="14" fill="#d32f2f">decision: "Pass" | "Fail"</text>
+  <text x="70" y="130" font-family="monospace" font-size="14" fill="#1976d2">llm_evaluation_score: 0-100</text>
+  <text x="70" y="160" font-family="monospace" font-size="14" fill="#388e3c">reason: String (Explanation)</text>
+  <text x="70" y="190" font-family="monospace" font-size="14" fill="#f57c00">improvement_prompt: String</text>
+  
+  <line x1="70" y1="210" x2="430" y2="210" stroke="#b0bec5" stroke-width="1" />
+  
+  <text x="70" y="235" font-family="sans-serif" font-size="14" font-weight="bold">7-Point Criteria (Pass/Fail):</text>
+  <text x="70" y="260" font-family="sans-serif" font-size="12">- subject_adherence</text>
+  <text x="70" y="280" font-family="sans-serif" font-size="12">- attribute_matching, spatial_accuracy, style_fidelity</text>
+  <text x="70" y="300" font-family="sans-serif" font-size="12">- quality_and_coherence, no_storyboard</text>
+  <text x="70" y="320" font-family="sans-serif" font-size="12">- consistency (CRITICAL)</text>
+
+</svg>

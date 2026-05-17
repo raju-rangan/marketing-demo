@@ -13,15 +13,19 @@
 # limitations under the License.
 
 import os
-import google.auth
+from dotenv import load_dotenv
 
-# Set environment variables for ADK
-_, project_id = google.auth.default()
-os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+# Load environment variables from .env file
+# The .env file is in the parent directory of 'app'
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path)
+
+# Set critical environment variables for ADK if not already set
+os.environ.setdefault("GOOGLE_CLOUD_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", ""))
+os.environ.setdefault("GOOGLE_CLOUD_LOCATION", os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
+os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "True")
 
 # Import the assembled app from the modular factory
-from .agent_factory import app
+from .agent_factory import app, root_agent
 
-__all__ = ["app"]
+__all__ = ["app", "root_agent"]

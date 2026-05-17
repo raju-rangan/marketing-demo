@@ -90,14 +90,15 @@ def create_bucket_from_spec(bucket_name: str, bucket_location: str, project: str
 
 
 def upload_to_gcs(
-    bucket_path: str, file_bytes: bytes, destination_blob_name: str
+    bucket_path: str, file_bytes: bytes, destination_blob_name: str, metadata: dict[str, str] | None = None
 ) -> str:
-    """Uploads a file to Google Cloud Storage
+    """Uploads a file to Google Cloud Storage with optional custom metadata.
 
     Args:
         bucket_path (str): Name of the GCS bucket/path (no tailing `/`).
         file_bytes (bytes): The file bytes to upload.
-        destination_blob_name (str): Name of the object in the GCS bucket (can be /folder/file.png).
+        destination_blob_name (str): Name of the object in the GCS bucket.
+        metadata (dict): Optional key-value pairs to store with the file.
 
     Returns:
         str: URI to resource in GCS.
@@ -123,9 +124,17 @@ def upload_to_gcs(
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_path)
 
+    if metadata:
+        blob.metadata = metadata
+    
+    # Automatically guess and set content type (crucial for VEO API)
+    mime_type, _ = mimetypes.guess_type(destination_blob_name)
+    if mime_type:
+        blob.content_type = mime_type
+
     blob.upload_from_file(io.BytesIO(file_bytes))
 
-    log_message(f"File uploaded to gs://{bucket_name}/{destination_blob_path}", Severity.INFO)
+    log_message(f"File uploaded to gs://{bucket_name}/{destination_blob_path} with metadata {metadata} and type {blob.content_type}", Severity.INFO)
 
     return f"gs://{bucket_name}/{destination_blob_path}"
 

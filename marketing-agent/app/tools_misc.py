@@ -16,6 +16,7 @@ import json
 import os
 from google.adk.tools.tool_context import ToolContext
 from .adk_common.utils.utils_logging import Severity, log_message
+from .adk_common.utils.utils_agents import SESSION_ARTIFACTS_STATE_KEY
 from .state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     PRODUCT_IMAGE_URI_STATE_KEY,
@@ -26,6 +27,8 @@ from .state import (
     SAPPHIRE_CARD_URI,
     FREEDOM_CARD_URI,
     PRIVATE_WEALTH_CARD_URI,
+    ASSET_REGISTRY_STATE_KEY,
+    UPLOAD_COUNTER_STATE_KEY,
 )
 from .utils_gcs import set_output_folder
 
@@ -44,7 +47,8 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str):
             "target_audience": "Affluent jetsetters, young professionals.",
             "logo_uri": JPMC_LOGO_URI,
             "product_image_uri": SAPPHIRE_CARD_URI,
-            "guide_file": "chase_sapphire_marketing_guide.md"
+            "guide_file": "chase_sapphire_marketing_guide.md",
+            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'Chase'. DO NOT mention 'J.P. Morgan', 'JPMorgan', or 'JPMC'."
         },
         "Chase Freedom Unlimited": {
             "company_name": "Chase",
@@ -53,7 +57,8 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str):
             "target_audience": "Everyday value seekers, students, families.",
             "logo_uri": JPMC_LOGO_URI,
             "product_image_uri": FREEDOM_CARD_URI,
-            "guide_file": "chase_freedom_marketing_guide.md"
+            "guide_file": "chase_freedom_marketing_guide.md",
+            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'Chase'. DO NOT mention 'J.P. Morgan', 'JPMorgan', or 'JPMC'."
         },
         "J.P. Morgan Private Wealth": {
             "company_name": "J.P. Morgan",
@@ -62,7 +67,8 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str):
             "target_audience": "Ultra-high-net-worth individuals.",
             "logo_uri": JPMC_LOGO_URI,
             "product_image_uri": PRIVATE_WEALTH_CARD_URI,
-            "guide_file": "jp_morgan_private_wealth_marketing_guide.md"
+            "guide_file": "jp_morgan_private_wealth_marketing_guide.md",
+            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'J.P. Morgan'. DO NOT mention 'Chase'."
         }
     }
 
@@ -81,12 +87,14 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str):
         except Exception:
             pass
 
+    # Inject exclusion rules at the TOP of guidelines
+    final_guidelines = f"{preset['exclusion_rules']}\n\n{guide_content}" if guide_content else preset['exclusion_rules']
+
     tool_context.state[PRODUCT_COMPANY_NAME_STATE_KEY] = preset["company_name"]
     tool_context.state["PRODUCT_NAME"] = preset["product_name"]
     tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = preset["product_image_uri"]
     tool_context.state[LOGO_IMAGE_URI_STATE_KEY] = preset["logo_uri"]
-    if guide_content:
-        tool_context.state[REFERENCE_GUIDELINES_STATE_KEY] = guide_content
+    tool_context.state[REFERENCE_GUIDELINES_STATE_KEY] = final_guidelines
 
     set_output_folder(tool_context)
     tool_context.state[PRODUCT_SETUP_DONE_STATE_KEY] = True
@@ -115,6 +123,44 @@ def query_internal_knowledge_base(query: str, brand: str) -> str:
         return f"No specific information found for '{query}' under brand '{brand}'."
     except Exception as e:
         return f"Error querying knowledge base: {e}"
+
+def process_user_uploads(tool_context: ToolContext):
+    """Scans for newly uploaded user images and registers them with high-priority tags."""
+    registry = tool_context.state.get(ASSET_REGISTRY_STATE_KEY, {})
+    artifacts = tool_context.state.get(SESSION_ARTIFACTS_STATE_KEY, {})
+    counter = tool_context.state.get(UPLOAD_COUNTER_STATE_KEY, 0)
+    
+    new_uploads = []
+    # Identify images that are in artifacts but not in our registry
+    registry_uris = set(registry.values())
+    
+    for art_id, art_data in artifacts.items():
+        uri = art_data.get("asset", {}).get("gcs_uri")
+        mime = art_data.get("asset", {}).get("mime_type", "")
+        if uri and uri not in registry_uris and "image" in mime.lower():
+            # It's a new image upload!
+            counter += 1
+            tag = f"upload-{counter}"
+            registry[tag] = uri
+            new_uploads.append(tag)
+            log_message(f"Auto-registered user upload: {tag} -> {uri}", Severity.INFO)
+
+    if new_uploads:
+        tool_context.state[ASSET_REGISTRY_STATE_KEY] = registry
+        tool_context.state[UPLOAD_COUNTER_STATE_KEY] = counter
+        return {"status": "success", "registered_uploads": new_uploads}
+    
+    return {"status": "success", "details": "No new uploads found."}
+
+def rename_asset_tag(tool_context: ToolContext, old_tag: str, new_tag: str):
+    """Renames an asset tag in the registry for easier reference."""
+    registry = tool_context.state.get(ASSET_REGISTRY_STATE_KEY, {})
+    if old_tag not in registry:
+        return {"status": "error", "details": f"Tag '{old_tag}' not found."}
+    
+    registry[new_tag] = registry.pop(old_tag)
+    tool_context.state[ASSET_REGISTRY_STATE_KEY] = registry
+    return {"status": "success", "old_tag": old_tag, "new_tag": new_tag}
 
 async def deploy_react_website(tool_context: ToolContext, brand_name: str, html_code: str) -> dict:
     """Simulates deploying a React-based landing page for the campaign."""

@@ -1,3 +1,4 @@
+-include .env
 
 # ==============================================================================
 # Installation & Setup
@@ -17,7 +18,10 @@ playground:
 	@echo "==============================================================================="
 	@echo "| 🚀 Starting your agent playground...                                        |"
 	@echo "|                                                                             |"
-	@echo "| 💡 Try asking: What's the weather in San Francisco?                         |"
+	@echo "| 💡 Try asking: Set up a marketing campaign for a new financial product.   |"
+	@echo "|                                                                             |"
+	@echo "| 🌐 Project ID: $(GOOGLE_CLOUD_PROJECT)"
+	@echo "| 🪣 Artifacts Bucket: $(GOOGLE_CLOUD_BUCKET_ARTIFACTS)"
 	@echo "|                                                                             |"
 	@echo "| 🔍 IMPORTANT: Select the 'app' folder (JPMC Marketing Agent) to interact with your agent. |"
 	@echo "==============================================================================="

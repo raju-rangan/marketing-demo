@@ -27,6 +27,7 @@ from .state import (
     CHOSEN_ASSET_SHEET_ID_STATE_KEY,
     PRODUCT_SETUP_DONE_STATE_KEY,
     REFERENCE_GUIDELINES_STATE_KEY,
+    ASSET_REGISTRY_STATE_KEY,
     DEMO_COMPANY_NAME,
     JPMC_LOGO_URI,
     SAPPHIRE_CARD_URI,
@@ -46,12 +47,15 @@ from .tools_campaign import (
 )
 from .tools_media import (
     generate_text_ad,
+    generate_display_ad,
     generate_campaign_storyboard,
     generate_video_from_storyboard,
 )
 from .tools_misc import (
     select_brand_preset,
     query_internal_knowledge_base,
+    process_user_uploads,
+    rename_asset_tag,
     deploy_react_website,
 )
 
@@ -75,12 +79,17 @@ def _dynamic_instruction_provider(context: ReadonlyContext) -> str:
     reference_guidelines = context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     has_guidelines = "Yes — guidelines loaded and active" if reference_guidelines else "No reference documents provided"
 
+    # Asset Registry Summary
+    registry = context.state.get(ASSET_REGISTRY_STATE_KEY, {})
+    registry_summary = "\n".join([f"- {tag}: {os.path.basename(uri)}" for tag, uri in registry.items()]) if registry else "Empty"
+
     prompt = prompt_template.replace("{{AGENT_NAME}}", "JPMCAgent")
     prompt = prompt.replace("{{DEMO_COMPANY_NAME}}", str(company_name))
     prompt = prompt.replace("{{SELECTED_CAMPAIGN_NAME}}", str(selected_campaign))
     prompt = prompt.replace("{{SELECTED_ASSET_SHEET_URI}}", str(selected_asset_sheet))
     prompt = prompt.replace("{{PRODUCT_SETUP_DONE}}", str(product_setup_done))
     prompt = prompt.replace("{{REFERENCE_GUIDELINES_STATUS}}", has_guidelines)
+    prompt = prompt.replace("{{ASSET_REGISTRY_SUMMARY}}", registry_summary)
     
     # Inject JPMC brand assets
     prompt = prompt.replace("{{JPMC_LOGO_URI}}", get_public_url(JPMC_LOGO_URI) if JPMC_LOGO_URI else "")
@@ -129,10 +138,13 @@ root_agent = Agent(
         set_customer_persona,
         clear_customer_persona,
         generate_text_ad,
+        generate_display_ad,
         generate_campaign_storyboard,
         generate_video_from_storyboard,
         select_brand_preset,
         query_internal_knowledge_base,
+        process_user_uploads,
+        rename_asset_tag,
         deploy_react_website,
         AgentTool(agent=trend_spotter_agent.agent),
     ],

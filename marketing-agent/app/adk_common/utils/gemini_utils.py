@@ -93,7 +93,7 @@ def get_gemini_client() -> genai.Client:
         return genai.Client(
             vertexai=get_google_genai_use_vertexai(),
             project=get_google_cloud_project(),
-            location=get_models_cloud_location(),
+            location="global",
         )
     except (auth_exceptions.DefaultCredentialsError, ValueError) as e:
         log_message(f"ERROR: Failed to initialize Gemini client: {e}", Severity.ERROR)

@@ -47,8 +47,7 @@ def get_public_url(blob_path: str) -> str:
             method="GET",
         )
     except Exception as e:
-        log_message(f"Failed to generate signed URL for {blob_path}: {e}", Severity.ERROR)
-        # Fallback to standard URL
+        # Fallback to standard URL if signing fails (common with User Credentials)
         return f"https://storage.googleapis.com/{GOOGLE_CLOUD_BUCKET_ARTIFACTS}/{blob_path}"
 
 def set_output_folder(tool_context):
@@ -83,9 +82,6 @@ def set_output_folder(tool_context):
         else:
             new_folder = safe_name
         
-        # We need to update it in a way that others can see it. 
-        # In a modular setup, we might want to store this in state or return it.
-        # For now, let's keep it in tool_context.state for better visibility.
         tool_context.state["CURRENT_OUTPUT_FOLDER"] = new_folder
         log_message(f"Output folder: {new_folder}", Severity.INFO)
         return new_folder
