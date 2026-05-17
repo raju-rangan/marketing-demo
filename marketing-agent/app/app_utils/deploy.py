@@ -22,6 +22,7 @@ import warnings
 from typing import Any
 
 import click
+import dotenv
 import google.auth
 import vertexai
 from google.cloud import resourcemanager_v3
@@ -294,6 +295,12 @@ def deploy_agent_engine_app(
     env_vars: dict[str, Any] = parse_key_value_pairs(set_env_vars)
     secrets = parse_secrets(set_secrets)
     labels_dict = parse_key_value_pairs(labels)
+
+    # Load local .env file values if present
+    dotenv_vars = dotenv.dotenv_values(".env")
+    for k, v in dotenv_vars.items():
+        if v and k not in env_vars and k != "GOOGLE_CLOUD_PROJECT":
+            env_vars[k] = v
 
     # Merge secrets into env_vars (secrets override plain env vars)
     env_vars.update(secrets)  # type: ignore
