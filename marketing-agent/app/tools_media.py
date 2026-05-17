@@ -350,7 +350,7 @@ def resolve_asset_uris(tool_context: ToolContext, tags: Optional[List[str]] = No
 async def _generate_storyline(company_name: str, product_name: str, rationale: str, reference_guidelines: str = "", customer_persona: str = "", duration_seconds: int = 24) -> dict:
     CLIP_SEC = 8
     ACTS = max(1, duration_seconds // CLIP_SEC)
-    words_per_act = 15
+    words_per_act = 25
 
     guidelines_context = f"\n\nReference Guidelines: {reference_guidelines[:1000]}" if reference_guidelines else ""
     persona_context = f"\n\nTARGET PERSONA: {customer_persona}" if customer_persona else ""
@@ -507,6 +507,7 @@ async def generate_campaign_storyboard(
         "status": "success", 
         "iteration": current_iter,
         "storyboard_uris": storyboard_uris,
+        "storyline": storyline_data.get("storyline", ""),
         "tags": [f"v{current_iter}-f{i+1}" for i in range(len(storyboard_uris))]
     }
 
@@ -697,7 +698,7 @@ async def generate_video_from_storyboard(
                 tagline = c.tagline or ""
                 break
 
-    final = add_text_overlays(final, company_name, tagline, duration_seconds, product_name=product_name)
+    final = add_text_overlays(final, company_name, tagline, duration_seconds, product_name=product_name, acts=acts, clip_sec=CLIP_SEC)
     final = add_end_card_overlay(final, company_name, tagline)
 
     filename = f"video_ad_final_{int(time.time())}.mp4"

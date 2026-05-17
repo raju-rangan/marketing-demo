@@ -16,6 +16,7 @@ import os
 import subprocess
 import tempfile
 import time
+from typing import Optional
 from .state import FFMPEG_EXE, FFPROBE_EXE
 from .adk_common.utils.utils_logging import Severity, log_message
 
@@ -168,8 +169,8 @@ def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float 
             return video_bytes
 
 def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video_duration: float,
-                      product_name: str = "", price: str = "") -> bytes:
-    """Adds cinematic text overlays at specific timestamps."""
+                      product_name: str = "", price: str = "", acts: Optional[list[dict]] = None, clip_sec: int = 8) -> bytes:
+    """Adds cinematic text overlays at specific timestamps, including voiceover captions."""
     with tempfile.TemporaryDirectory() as tmpdir:
         v_in = os.path.join(tmpdir, "in.mp4")
         v_out = os.path.join(tmpdir, "out.mp4")
@@ -190,6 +191,18 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
                 f"drawtext=text='{product_name}':fontcolor=white:fontsize=36:x=40:y=h-80:"
                 f"enable='between(t,2,{video_duration})'"
             )
+
+        # Voiceover Captions (centered at bottom)
+        if acts:
+            for idx, act in enumerate(acts):
+                vo_text = act.get("voiceover", "").replace("'", "\\'").replace(":", "\\:")
+                if vo_text:
+                    start_t = idx * clip_sec
+                    end_t = (idx + 1) * clip_sec
+                    filters.append(
+                        f"drawtext=text='{vo_text}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=h-150:"
+                        f"enable='between(t,{start_t},{end_t})':borderw=2:bordercolor=black"
+                    )
 
         # Tagline (center, appears later)
         if tagline:
