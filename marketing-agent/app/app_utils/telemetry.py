@@ -14,21 +14,50 @@
 
 import logging
 import os
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+from opentelemetry.instrumentation.google_genai import GoogleGenAiSdkInstrumentor
 
 
 def setup_telemetry() -> str | None:
-    """Configure OpenTelemetry and GenAI telemetry with GCS upload."""
+    """Configure OpenTelemetry and GenAI telemetry with Cloud Trace and GCS upload."""
     os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "true")
 
-    bucket = os.environ.get("LOGS_BUCKET_NAME")
+    # 1. OpenTelemetry Tracing Setup (Cloud Trace)
+    try:
+        # Use a project ID from environment or default
+        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        
+        provider = TracerProvider()
+        exporter = CloudTraceSpanExporter(project_id=project_id)
+        processor = BatchSpanProcessor(exporter)
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        
+        # Instrument the Google GenAI SDK
+        GoogleGenAiSdkInstrumentor().instrument()
+        logging.info("OpenTelemetry Tracing initialized with Cloud Trace exporter.")
+    except Exception as e:
+        logging.warning(f"Could not initialize OpenTelemetry/CloudTrace: {e}")
+
+    # 2. GCS Upload Telemetry (Legacy / Sidecar logging)
+    bucket = os.environ.get("LOGS_BUCKET_NAME") or os.environ.get("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
     capture_content = os.environ.get(
-        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false"
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "true"
     )
+    
     if bucket and capture_content != "false":
         logging.info(
-            "Prompt-response logging enabled - mode: NO_CONTENT (metadata only, no prompts/responses)"
+            f"Prompt-response GCS logging enabled via bucket: {bucket}"
         )
-        os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "NO_CONTENT"
+        # If the user explicitly wants full content, we honor it, otherwise default to NO_CONTENT
+        if capture_content == "true":
+            os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
+        else:
+            os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "NO_CONTENT"
+            
         os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_UPLOAD_FORMAT", "jsonl")
         os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_COMPLETION_HOOK", "upload")
         os.environ.setdefault(
@@ -46,7 +75,7 @@ def setup_telemetry() -> str | None:
         )
     else:
         logging.info(
-            "Prompt-response logging disabled (set LOGS_BUCKET_NAME=gs://your-bucket and OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT to enable)"
+            "Prompt-response GCS logging disabled (set LOGS_BUCKET_NAME or GOOGLE_CLOUD_BUCKET_ARTIFACTS to enable)"
         )
 
     return bucket

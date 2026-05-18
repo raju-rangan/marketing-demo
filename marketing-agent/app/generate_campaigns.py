@@ -294,7 +294,7 @@ def generate_campaigns_xml(
 
         try:
             response = client.models.generate_content(
-                model="gemini-3.1-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=[
                     types.Content(
                         role="user",

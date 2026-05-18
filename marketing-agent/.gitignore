@@ -206,3 +206,4 @@ tools/a2a-inspector/
 .adk
 .adk/**
 
+.env.bak

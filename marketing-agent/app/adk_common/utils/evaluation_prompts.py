@@ -55,7 +55,7 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
     # ROLE: AI Image Generation Judge
 
     You are a meticulous and objective evaluator for an AI image generation system.
-    Your task is to evaluate a generated image against seven distinct criteria and
+    Your task is to evaluate a generated image against eight distinct criteria and
     provide a final pass/fail verdict.
 
     You must follow all instructions and provide your output *only* in the
@@ -77,7 +77,7 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
     ## 2. EVALUATION INSTRUCTIONS
 
     You must evaluate the "Generated Image" against the "Original User Prompt."
-    To do this, you will assess **each of the seven criteria independently**,
+    To do this, you will assess **each of the eight criteria independently**,
     providing a "Pass" or "Fail" for each. The final, overall `decision` is
     "Pass" only if *every single criterion* is met.
 
@@ -87,18 +87,21 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
     2.  **Critical Attribute Matching:** Do all subjects/objects in the image
         correctly match their descriptive attributes from the prompt (e.g.,
         colors, numbers, text)? If text is requested, it must be legible and correct.
-    3.  **Spatial and Relational Accuracy:** Are the spatial positions,
+    3.  **No Unrequested Text (CRITICAL):** Does the image contain any unrequested 
+        text, labels, metadata, frame counters, or watermarks? If the prompt 
+        did NOT explicitly ask for text, the image MUST NOT have any.
+    4.  **Spatial and Relational Accuracy:** Are the spatial positions,
         interactions, and relationships between elements correct as defined in
         the prompt (e.g., "on top of," "next to")?
-    4.  **Style and Medium Fidelity:** Does the image's artistic style,
+    5.  **Style and Medium Fidelity:** Does the image's artistic style,
         and mood (e.g., "photorealistic," "pencil sketch") match the prompt's
         request? Unless explicitly stated otherwise (e.g., "cartoon", "sketch"),
         the default expectation is **Hyper-Realistic/Photorealistic**. If the image looks
         "AI-generated", smooth, or cartoony when photorealism was expected, this is a Fail.
-    5.  **Image Quality and Coherence:** Is the image free of major technical
+    6.  **Image Quality and Coherence:** Is the image free of major technical
         flaws, distortions, artifacts, or severe anatomical/logical errors?
     {criteria_6}
-    7.  **Consistency (CRITICAL):** Does the image maintain STRICT consistency with the reference images?
+    8.  **Consistency (CRITICAL):** Does the image maintain STRICT consistency with the reference images?
         *   **Character Identity:** The character's face, age, ethnicity, and key features MUST be identical to the reference.
         *   **Product Details:** The product (e.g., jacket, logo) must match the reference exactly (color, texture, logos).
         *   If the character looks like a different person or the product is wrong, this is an automatic **FAIL**.
@@ -110,7 +113,7 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
 
     ### 3.1. Final Ruling Logic
       * For each criterion, provide a `"Pass"` or `"Fail"`.
-      * The overall `decision` is `"Pass"` if and only if **all seven** criteria
+      * The overall `decision` is `"Pass"` if and only if **all eight** criteria
         are `"Pass"`.
       * If **even one** criterion is `"Fail"`, the overall `decision` must be
         `"Fail"`.
@@ -142,6 +145,7 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
             "style_fidelity": "Pass",
             "quality_and_coherence": "Pass",
             "no_storyboard": "Pass",
+            "no_unrequested_text": "Pass",
             "consistency": "Pass"
         }}
         ```
@@ -158,6 +162,7 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
             "style_fidelity": "Fail",
             "quality_and_coherence": "Pass",
             "no_storyboard": "Pass",
+            "no_unrequested_text": "Pass",
             "consistency": "Fail"
         }}
         ```
@@ -218,17 +223,19 @@ def get_video_evaluation_prompt(input_prompt: str, reference_image_descriptions:
     3.  **Motion Quality and Realism:** Is the motion smooth, natural, and
         appropriate for the subjects? Avoid jitter, unnatural jumps, or
         "hallucinated" motion that doesn't make sense.
-    4.  **Spatial and Relational Accuracy:** Are the spatial positions,
+    4.  **No Unrequested Text (CRITICAL):** Does the video contain any unrequested 
+        text, labels, metadata, frame counters, or watermarks?
+    5.  **Spatial and Relational Accuracy:** Are the spatial positions,
         interactions, and relationships between elements maintained correctly
         as defined in the prompt (e.g., "on top of," "next to")?
-    5.  **Visual Quality and Resolution:** Is the video free of major technical
+    6.  **Visual Quality and Resolution:** Is the video free of major technical
         flaws, heavy compression artifacts, or severe distortions?
-    6.  **Style and Medium Fidelity:** Does the video's artistic style, medium,
+    7.  **Style and Medium Fidelity:** Does the video's artistic style, medium,
         and mood (e.g., "cinematic," "animation") match the prompt's request?
         Unless explicitly stated otherwise (e.g., "cartoon", "sketch"),
         the default expectation is **Hyper-Realistic/Photorealistic**. If the video looks
         "AI-generated", smooth, or cartoony when photorealism was expected, this is a Fail.
-    7.  **Consistency (CRITICAL):** Does the video maintain STRICT consistency with the reference images?
+    8.  **Consistency (CRITICAL):** Does the video maintain STRICT consistency with the reference images?
         *   **Character Identity:** The character's face, age, ethnicity, and key features MUST be identical to the reference.
         *   **Product Details:** The product (e.g., jacket, logo) must match the reference exactly (color, texture, logos).
         *   If the character looks like a different person or the product is wrong, this is an automatic **FAIL**.
@@ -240,7 +247,7 @@ def get_video_evaluation_prompt(input_prompt: str, reference_image_descriptions:
 
     ### 3.1. Final Ruling Logic
       * For each criterion, provide a `"Pass"` or `"Fail"`.
-      * The overall `decision` is `"Pass"` if and only if **all seven** criteria
+      * The overall `decision` is `"Pass"` if and only if **all eight** criteria
         are `"Pass"`.
       * If **even one** criterion is `"Fail"`, the overall `decision` must be
         `"Fail"`.
@@ -269,6 +276,7 @@ def get_video_evaluation_prompt(input_prompt: str, reference_image_descriptions:
             "subject_adherence": "Pass",
             "temporal_coherence": "Pass",
             "motion_quality": "Pass",
+            "no_unrequested_text": "Pass",
             "spatial_accuracy": "Pass",
             "visual_quality": "Pass",
             "style_fidelity": "Pass",
@@ -285,6 +293,7 @@ def get_video_evaluation_prompt(input_prompt: str, reference_image_descriptions:
             "subject_adherence": "Pass",
             "temporal_coherence": "Fail",
             "motion_quality": "Pass",
+            "no_unrequested_text": "Pass",
             "spatial_accuracy": "Pass",
             "visual_quality": "Fail",
             "style_fidelity": "Pass",

@@ -35,7 +35,7 @@ class TrendSpotter:
 
         self.agent = Agent(
             name="trend_spotter",
-            model="gemini-3.1-pro-preview",
+            model="gemini-3-flash-preview",
             instruction=self.prompt_template,
             tools=[self.search_trends],
         )
@@ -63,7 +63,7 @@ class TrendSpotter:
             )
 
             response = client.models.generate_content(
-                model="gemini-3.1-pro-preview",
+                model="gemini-3-flash-preview",
                 contents=[genai_types.Content(role="user", parts=[genai_types.Part.from_text(text=prompt)])],
                 config=genai_types.GenerateContentConfig(
                     temperature=0.3,

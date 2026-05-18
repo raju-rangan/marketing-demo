@@ -14,6 +14,18 @@
         {
           "rubricId": "helpfulness",
           "rubricContent": { "textProperty": "The response is helpful and provides useful information." }
+        },
+        {
+          "rubricId": "brand_purity",
+          "rubricContent": { "textProperty": "The response strictly adheres to brand silos. If the product is 'Chase', it must NOT mention 'J.P. Morgan' or 'JPMC'. If the product is 'J.P. Morgan', it must NOT mention 'Chase'." }
+        },
+        {
+          "rubricId": "narrative_flow",
+          "rubricContent": { "textProperty": "The storyline and storyboard acts have a logical, cinematic, and emotional progression." }
+        },
+        {
+          "rubricId": "technical_readiness",
+          "rubricContent": { "textProperty": "The agent correctly identifies tool dependencies (e.g., loading brand guidelines before generating assets) and returns appropriate asset tags (v1-f1, etc)." }
         }
       ]
     }

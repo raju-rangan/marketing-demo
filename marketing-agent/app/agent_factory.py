@@ -126,7 +126,7 @@ trend_spotter_agent = TrendSpotter()
 
 root_agent = Agent(
     name="marketing_agent",
-    model=Gemini(model="gemini-3.1-pro-preview"),
+    model=Gemini(model="gemini-3-flash-preview"),
     instruction=_dynamic_instruction_provider,
     description="Combined JPMC Marketing Campaign Agent. Handles ideation, creative direction, and media generation.",
     tools=[

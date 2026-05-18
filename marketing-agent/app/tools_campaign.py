@@ -164,5 +164,5 @@ def set_customer_persona(tool_context: ToolContext, persona_number: int):
 def clear_customer_persona(tool_context: ToolContext):
     """Clears the customer persona from the session state."""
     if CUSTOMER_PERSONA_STATE_KEY in tool_context.state:
-        del tool_context.state[CUSTOMER_PERSONA_STATE_KEY]
+        tool_context.state[CUSTOMER_PERSONA_STATE_KEY] = None
     return {"status": "success", "details": "Customer persona cleared."}

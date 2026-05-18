@@ -31,6 +31,7 @@ class EvalResult(BaseModel):
     style_fidelity: Literal["Pass", "Fail"]
     quality_and_coherence: Literal["Pass", "Fail"]
     no_storyboard: Literal["Pass", "Fail"]
+    no_unrequested_text: Literal["Pass", "Fail"]
     consistency: Literal["Pass", "Fail"]
     llm_evaluation_score: int
     calculated_evaluation_score: int = 0
@@ -49,6 +50,7 @@ class EvalResult(BaseModel):
             "style_fidelity": 2,
             "quality_and_coherence": 2,
             "no_storyboard": 2,
+            "no_unrequested_text": 2,
             "consistency": 3
         }
 

@@ -1,4 +1,5 @@
 -include .env
+export
 
 # ==============================================================================
 # Installation & Setup
@@ -68,7 +69,7 @@ eval:
 	@echo "| Running Agent Evaluation                                                    |"
 	@echo "==============================================================================="
 	uv sync --dev --extra eval
-	uv run adk eval ./app $${EVALSET:-tests/eval/evalsets/basic.evalset.json} \
+	uv run adk eval ./app $${tests/eval/evalsets/marketing.evalset.json} \
 		$(if $(EVAL_CONFIG),--config_file_path=$(EVAL_CONFIG),$(if $(wildcard tests/eval/eval_config.json),--config_file_path=tests/eval/eval_config.json,))
 
 # Run evaluation with all evalsets
@@ -101,4 +102,5 @@ lint:
 # For non-interactive use, set env vars: ID or GEMINI_ENTERPRISE_APP_ID (full GE resource name)
 # Optional env vars: GEMINI_DISPLAY_NAME, GEMINI_DESCRIPTION, GEMINI_TOOL_DESCRIPTION, AGENT_ENGINE_ID
 register-gemini-enterprise:
-	@uvx agent-starter-pack@0.41.3 register-gemini-enterprise
+	uv pip install agent-starter-pack==0.41.3
+	uv run --env-file .env agent-starter-pack register-gemini-enterprise

@@ -115,32 +115,29 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
 
         if audio_count == 1:
             amix = "[vo]" if voiceover_bytes else "[bgm]"
+            map_audio = "[vo]" if voiceover_bytes else "[bgm]"
         else:
             amix = "[vo][bgm]amix=inputs=2:duration=first[aout]"
+            map_audio = "[aout]"
 
         output_path = os.path.join(tmpdir, "mixed.mp4")
         cmd = [FFMPEG_EXE, "-y"] + inputs + [
             "-filter_complex", "; ".join(filter_complex) + ("; " + amix if audio_count > 1 else ""),
-            "-map", "0:v", "-map", amix.replace("[aout]", "aout").split("]")[-1] if audio_count == 1 else "[aout]",
+            "-map", "0:v", "-map", map_audio,
             "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
         ]
-        
-        # Simpler command if amix failed to parse
-        if audio_count == 2:
-             cmd = [FFMPEG_EXE, "-y"] + inputs + [
-                "-filter_complex", "[1:a]volume=1.0[a1]; [2:a]volume=0.15[a2]; [a1][a2]amix=inputs=2:duration=first[aout]",
-                "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
-            ]
-        elif audio_count == 1:
-            cmd = [FFMPEG_EXE, "-y"] + inputs + [
-                "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
-            ]
 
         try:
             subprocess.run(cmd, check=True, capture_output=True)
             with open(output_path, "rb") as f:
                 return f.read()
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode() if e.stderr else str(e)
+            print(f"FFMPEG ERROR: {err_msg}")
+            log_message(f"Audio mixing failed: {err_msg}", Severity.ERROR)
+            return video_bytes
         except Exception as e:
+            print(f"Audio mix exception: {e}")
             log_message(f"Audio mixing failed: {e}", Severity.ERROR)
             return video_bytes
 
@@ -192,18 +189,6 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
                 f"enable='between(t,2,{video_duration})'"
             )
 
-        # Voiceover Captions (centered at bottom)
-        if acts:
-            for idx, act in enumerate(acts):
-                vo_text = act.get("voiceover", "").replace("'", "\\'").replace(":", "\\:")
-                if vo_text:
-                    start_t = idx * clip_sec
-                    end_t = (idx + 1) * clip_sec
-                    filters.append(
-                        f"drawtext=text='{vo_text}':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=h-150:"
-                        f"enable='between(t,{start_t},{end_t})':borderw=2:bordercolor=black"
-                    )
-
         # Tagline (center, appears later)
         if tagline:
             filters.append(
@@ -253,9 +238,15 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
         
         try:
             subprocess.run(cmd, check=True, capture_output=True)
-            # Try to put original audio back (it will just end early)
+            # Try to put original audio back and pad with silence
             final_path = os.path.join(tmpdir, "final.mp4")
-            subprocess.run([FFMPEG_EXE, "-y", "-i", v_out, "-i", v_in, "-map", "0:v", "-map", "1:a?", "-c", "copy", "-shortest", final_path], capture_output=True)
+            subprocess.run([
+                FFMPEG_EXE, "-y", "-i", v_out, "-i", v_in, 
+                "-map", "0:v", "-map", "1:a?", 
+                "-c:v", "copy", "-c:a", "aac", 
+                "-af", "apad", "-shortest", 
+                final_path
+            ], capture_output=True)
             
             p = final_path if os.path.exists(final_path) else v_out
             with open(p, "rb") as f:

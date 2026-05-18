@@ -30,11 +30,89 @@ from google.iam.v1 import iam_policy_pb2, policy_pb2
 from vertexai._genai import _agent_engines_utils
 from vertexai._genai.types import AgentEngine, AgentEngineConfig, IdentityType
 
+import os
+import shutil
+from google.cloud import storage
+
 # Suppress google-cloud-storage version compatibility warning
 warnings.filterwarnings(
     "ignore", category=FutureWarning, module="google.cloud.aiplatform"
 )
 
+def bootstrap_infrastructure(project_id: str, location: str) -> str:
+    """Creates the artifacts bucket and updates the .env file for the new project."""
+    bucket_name = f"{project_id}-artifacts"
+    client = storage.Client(project=project_id)
+    
+    try:
+        bucket = client.get_bucket(bucket_name)
+        click.echo(f"  ✅ Artifacts bucket already exists: gs://{bucket_name}")
+    except Exception:
+        click.echo(f"  🔧 Creating artifacts bucket: gs://{bucket_name}")
+        bucket = client.create_bucket(bucket_name, location=location)
+        click.echo(f"  ✅ Created bucket: gs://{bucket_name}")
+
+    # Update .env file with new project details
+    dotenv_path = ".env"
+    example_path = ".env.example"
+    
+    # Load from .env if it exists, otherwise from .env.example
+    if os.path.exists(dotenv_path):
+        env_config = dotenv.dotenv_values(dotenv_path)
+    elif os.path.exists(example_path):
+        env_config = dotenv.dotenv_values(example_path)
+    else:
+        env_config = {}
+
+    # Update critical keys
+    env_config["GOOGLE_CLOUD_PROJECT"] = project_id
+    env_config["PROJECT_ID"] = project_id
+    env_config["GOOGLE_CLOUD_BUCKET_ARTIFACTS"] = bucket_name
+    env_config["MARKETING_ANALYST_DATASTORE_CLOUD_BUCKET"] = bucket_name
+    env_config["LOGS_BUCKET_NAME"] = bucket_name
+    
+    # Replace old project bucket URIs with the new one
+    old_bucket_suffix = "-artifacts"
+    for k, v in env_config.items():
+        if v and ("gs://" in v or "storage.googleapis.com" in v) and old_bucket_suffix in v:
+            if "gs://" in v:
+                parts = v.split("/", 3)
+                if len(parts) >= 3:
+                    new_v = f"gs://{bucket_name}/" + (parts[3] if len(parts) > 3 else "")
+                    env_config[k] = new_v.rstrip("/")
+            elif "storage.googleapis.com" in v:
+                parts = v.split("/", 4)
+                if len(parts) >= 4:
+                    new_v = f"https://storage.googleapis.com/{bucket_name}/" + (parts[4] if len(parts) > 4 else "")
+                    env_config[k] = new_v.rstrip("/")
+
+    # Write back to .env
+    with open(dotenv_path, "w") as f:
+        for k, v in env_config.items():
+            f.write(f"{k}={v}\n")
+    
+    click.echo(f"  ✅ Updated {dotenv_path} with new project configuration.")
+    return bucket_name
+
+def sync_assets(project_id: str, bucket_name: str, assets_dir: str = "app/assets/samples"):
+    """Uploads the local assets directory to the GCS bucket."""
+    if not os.path.exists(assets_dir):
+        click.echo(f"  ⚠️ Warning: Assets directory not found at {assets_dir}. Skipping sync.")
+        return
+
+    client = storage.Client(project=project_id)
+    bucket = client.get_bucket(bucket_name)
+
+    click.echo(f"  🚀 Synchronizing assets from {assets_dir} to gs://{bucket_name}/samples/...")
+    for root, _, files in os.walk(assets_dir):
+        for file in files:
+            local_path = os.path.join(root, file)
+            # We want to upload to the 'samples/' prefix in the bucket
+            blob_path = f"samples/{file}"
+            blob = bucket.blob(blob_path)
+            blob.upload_from_filename(local_path)
+            click.echo(f"    - Uploaded {blob_path}")
+    click.echo("  ✅ Asset synchronization complete.")
 
 def generate_class_methods_from_agent(agent_instance: Any) -> list[dict[str, Any]]:
     """Generate method specifications with schemas from agent's register_operations().
@@ -297,6 +375,14 @@ def deploy_agent_engine_app(
     secrets = parse_secrets(set_secrets)
     labels_dict = parse_key_value_pairs(labels)
 
+    if not project:
+        _, project = google.auth.default()
+
+    # Bootstrap infrastructure and sync assets if project is provided
+    if project:
+        bucket_name = bootstrap_infrastructure(project, location)
+        sync_assets(project, bucket_name)
+
     # Load local .env file values if present
     dotenv_vars = dotenv.dotenv_values(".env")
     for k, v in dotenv_vars.items():
@@ -313,9 +399,6 @@ def deploy_agent_engine_app(
     # Enable telemetry by default for Agent Engine
     env_vars.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "true")
     env_vars.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "true")
-
-    if not project:
-        _, project = google.auth.default()
 
     print("""
     ╔═══════════════════════════════════════════════════════════╗

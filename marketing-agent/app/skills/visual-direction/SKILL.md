@@ -71,4 +71,8 @@ Always render products at REAL-WORLD physical size relative to people and enviro
 - **Rim/Back Light**: Separates subject from background, creates depth
 - **Practical Lights**: In-scene light sources (neon signs, candles, screen glow)
 
+## Cleanliness & Safety (CRITICAL)
+- **NO UNREQUESTED TEXT**: Never include text, labels, numbers, logos (unless specifically provided as a reference), or watermark-style overlays in the image. The image should be a pure visual scene.
+- **NO METADATA**: Do not include any technical info, frame counts, or camera settings as text on the image.
+
 Read `references/color-palettes.md` for industry-specific color palette recommendations.
