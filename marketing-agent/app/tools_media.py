@@ -274,7 +274,7 @@ async def _generate_voiceover_audio(script: str) -> bytes | None:
         if not script or len(script.strip()) < 5:
             return None
 
-        log_message(f"Generating voiceover for script: {script[:100]}...", Severity.INFO)
+        log_message(f"Generating voiceover for script: {script}...", Severity.INFO)
         
         for attempt in range(3):
             try:
@@ -620,15 +620,15 @@ async def generate_display_ad(
 
 async def generate_video_from_storyboard(
     tool_context: ToolContext, selected_campaign_name: str, segment_name: str, duration_seconds: int = 24,
-    asset_tags: Optional[List[str]] = None
+    asset_tags: Optional[List[str]] = None, voiceover_script: Optional[str] = None
 ):
     """Produces the final stitched cinematic VEO video ad using a prioritized list of asset tags."""
     current_output_folder = set_output_folder(tool_context)
     storyline_data = tool_context.state.get("STORYLINE_DATA")
-    
+
     # Priority Resolver Logic
     storyboard_uris = resolve_asset_uris(tool_context, asset_tags)
-    
+
     if not storyline_data or not storyboard_uris:
         return {"status": "error", "details": "No storyboard frames found. Run generate_campaign_storyboard or upload images first."}
 
@@ -640,8 +640,9 @@ async def generate_video_from_storyboard(
 
     CLIP_SEC = 8
     ACTS = max(1, duration_seconds // CLIP_SEC)
-    
-    voiceover_script = storyline_data.get("storyline", "")
+
+    # Use provided voiceover_script if available, otherwise fall back to storyline
+    final_voiceover_script = voiceover_script if voiceover_script else storyline_data.get("storyline", "")
     lyria_prompt = storyline_data.get("lyria_prompt", "")
     acts = storyline_data.get("acts", [])
     while len(acts) < ACTS:
@@ -657,18 +658,20 @@ async def generate_video_from_storyboard(
         except Exception: pass
 
     # Start audio tasks in parallel
-    vo_task = asyncio.create_task(_generate_voiceover_audio(voiceover_script))
+    vo_task = asyncio.create_task(_generate_voiceover_audio(final_voiceover_script))
     lyria_task = asyncio.create_task(_generate_lyria_music(lyria_prompt, product_name))
 
     async def _gen_clip(act_idx):
         act = acts[act_idx]
-        motion = act.get("motion_prompt", f"Cinematic shot of human activity")
+        motion = act.get("timestamped_visual_actions", "[00:00-00:08] Cinematic shot of human activity")
         transition = "CONTINUOUS SMOOTH MOTION. Constant cinematic movement throughout. REAL-LIFE PHYSICS."
         full_motion = _sanitize_veo_prompt(f"{motion}. TRANSITION EFFECT: {transition}")
-        
+
+        log_message(f"VEO FINAL PROMPT (Act {act_idx+1}):\n{full_motion}", Severity.INFO)
+
         start_uri = storyboard_uris[act_idx] if act_idx < len(storyboard_uris) else storyboard_uris[-1]
         end_uri = storyboard_uris[act_idx + 1] if act_idx + 1 < len(storyboard_uris) else None
-        
+
         return act_idx, await _generate_single_veo_clip(full_motion, start_uri, CLIP_SEC, end_uri, label=f"act_{act_idx+1}")
 
     log_message(f"Triggering {ACTS} VEO clips in parallel...", Severity.INFO)
