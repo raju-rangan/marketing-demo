@@ -17,8 +17,20 @@ import subprocess
 import tempfile
 import time
 from typing import Optional
-from .state import FFMPEG_EXE, FFPROBE_EXE
-from .adk_common.utils.utils_logging import Severity, log_message
+import shutil
+import logging
+from enum import Enum
+
+class Severity(Enum):
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    ERROR = logging.ERROR
+
+def log_message(msg: str, severity: Severity = Severity.INFO):
+    logging.log(severity.value, msg)
+
+FFMPEG_EXE = shutil.which("ffmpeg") or "ffmpeg"
+FFPROBE_EXE = shutil.which("ffprobe") or "ffprobe"
 
 def get_video_duration(video_path: str) -> float:
     """Gets duration of a video file using ffprobe."""
@@ -253,3 +265,75 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
                 return f.read()
         except Exception:
             return video_bytes
+
+def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0) -> bytes | None:
+    """
+    Compiles a slidecast video using ffmpeg with hard cuts (fast).
+    `slides` is a list of dicts: {"image_bytes": bytes, "audio_bytes": bytes, "text_overlay": str}
+    """
+    if not slides:
+        return None
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        inputs = []
+        filter_complex = []
+        
+        for i, slide in enumerate(slides):
+            img_path = os.path.join(tmpdir, f"img_{i}.png")
+            aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
+            
+            with open(img_path, "wb") as f: f.write(slide["image_bytes"])
+            with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
+            
+            dur_cmd = [FFPROBE_EXE, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", aud_path]
+            try:
+                dur_str = subprocess.check_output(dur_cmd).decode().strip()
+                dur = float(dur_str)
+            except Exception as e:
+                logger.error(f"Failed to get audio duration for slide {i}: {e}")
+                dur = 5.0
+            
+            # Use simple loop with exact duration
+            inputs.extend(["-loop", "1", "-t", str(dur), "-i", img_path])
+            inputs.extend(["-i", aud_path])
+            
+            v_idx = i * 2
+            a_idx = i * 2 + 1
+            text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
+            
+            # Simple scale and pad, no zoom
+            v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,"
+            if text:
+                v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
+            
+            v_filter = v_filter.rstrip(",")
+            v_filter += f"[v{i}];"
+            filter_complex.append(v_filter)
+            
+            # Force stereo/sample rate for consistent concat
+            filter_complex.append(f"[{a_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];")
+
+        # Concat all slides (requires alternating v/a streams [v0][a0][v1][a1])
+        concat_streams = "".join([f"[v{i}][a{i}]" for i in range(len(slides))])
+        filter_complex.append(f"{concat_streams}concat=n={len(slides)}:v=1:a=1[vout][aout]")
+        
+        final_filter_str = "".join(filter_complex)
+        output_path = os.path.join(tmpdir, "slidecast.mp4")
+        
+        cmd = [FFMPEG_EXE, "-y"] + inputs + [
+            "-filter_complex", final_filter_str,
+            "-map", "[vout]", "-map", "[aout]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            output_path
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            with open(output_path, "rb") as f:
+                return f.read()
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode() if e.stderr else str(e)
+            print(f"FFMPEG Error details:\n{err_msg}")
+            log_message(f"Slidecast compilation failed: {err_msg}", Severity.ERROR)
+            return None

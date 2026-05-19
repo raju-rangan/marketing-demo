@@ -53,7 +53,7 @@ from .state import (
     UPLOAD_COUNTER_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
-from .utils_media import (
+from shared_infra.utils_media import (
     stitch_videos,
     mix_audio_onto_video,
     overlay_logo_on_video,
