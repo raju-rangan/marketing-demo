@@ -59,6 +59,12 @@ from .tools_misc import (
     deploy_react_website,
 )
 
+from .tools_slidecast import (
+    research_urls_to_report,
+    generate_slidecast_storyboard,
+    produce_slidecast_video,
+)
+
 # Import sub-agents
 from .sub_agents.trend_spotter import TrendSpotter
 
@@ -146,6 +152,9 @@ root_agent = Agent(
         process_user_uploads,
         rename_asset_tag,
         deploy_react_website,
+        research_urls_to_report,
+        generate_slidecast_storyboard,
+        produce_slidecast_video,
         AgentTool(agent=trend_spotter_agent.agent),
     ],
 )
