@@ -133,17 +133,18 @@ Before publishing to Google Ads or generating the final costly VEO video:
 When the user asks to create an educational video or "Slidecast" from URLs:
 1. **Planning & Research**: 
    - ALWAYS load the `slide-design` and `financial-marketing` skills.
-   - Call `research_urls_to_report(urls=[...])` and present the key insights to the user.
-   - Explain that you will create a 5-7 minute in-depth educational journey.
-2. **Storyboard Generation**: 
+   - Call `research_urls_to_report(urls=[...])` and present the key insights.
+2. **Master Plan Generation**: 
    - Call `generate_slidecast_storyboard(duration_minutes=6)`. 
-   - The resulting storyboard will be a MASTER PLAN with 12-20 slides and thorough educational narrations (~150-200 words per slide).
-3. **MANDATORY REVIEW**: 
-   - Present the FULL storyboard to the user: Slide-by-slide titles, visual descriptions (infographics/diagrams), and the complete voiceover scripts.
-   - You MUST say: "Please review the slide content, visual design, and narration script. Once you approve, I will begin the multi-modal production phase."
-4. **Production**: 
-   - ONLY after explicit user approval, call `produce_slidecast_video`.
-   - Remind the user: "Generating assets for a 6-minute masterclass... this will take a few minutes as I render each custom infographic and record the narrations."
+   - This targets a **160 WPM speaking rate** (~800-1000 words total for a 5-7 min video).
+   - Present the slide sequence and narration scripts to the user.
+3. **Asset Preview (MANDATORY)**: 
+   - Once the user approves the text-based plan, call `preview_slidecast_assets`.
+   - This will generate the **actual images (infographics)** and **audio clips** for every slide.
+   - Present these side-by-side: "Here are the generated infographics and the final talk tracks. Please review them for visual accuracy and tone."
+4. **Finalization**: 
+   - After the user approves the visual assets, call `finalize_slidecast_video`.
+   - This compiles everything into the final MP4 with background music and the JPMC logo.
 
 # 5. Formatting Rules
 

@@ -58,31 +58,33 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
 
 def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5) -> dict:
     """Generates a long-form SlidecastStoryboard (JSON) from a research report.
-    Designed for 5-7 minute educational videos (12-20 slides).
+    Targets 160 words per minute (WPM) for precise duration control.
     """
-    log_message(f"Generating long-form ({duration_minutes} min) educational storyboard...", Severity.INFO)
-    
+    log_message(f"Generating storyboard for {duration_minutes} min video (~160 WPM target)...", Severity.INFO)
+
     company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
-    # Estimate number of slides for the duration. Assuming ~20-30 seconds per slide.
-    # 5 mins = 300s. 300 / 25 = 12 slides. 7 mins = 420s. 420 / 25 = 17 slides.
+    # Calculate total word target: 5 mins * 160 WPM = 800 words.
+    total_word_target = duration_minutes * 160
+    # Estimate number of slides. ~15 slides for 5-7 mins.
     num_slides = max(12, min(20, duration_minutes * 3))
+    words_per_slide = total_word_target // num_slides
 
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
         f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast'.\n\n"
-        f"CONTENT STRATEGY:\n"
+        f"DURATION & WORD COUNT TARGETS:\n"
         f"- Target Duration: {duration_minutes} minutes.\n"
+        f"- Total Word Count: Approximately {total_word_target} words total (speaking rate: 160 WPM).\n"
         f"- Total Slides: {num_slides} distinct slides.\n"
-        f"- Brand Wall: {brand_wall}\n"
-        f"- Reference Guidelines: {brand_guidelines[:1000] if brand_guidelines else 'N/A'}\n\n"
+        f"- Target per slide: ~{words_per_slide} words of narration.\n\n"
         f"CORE DIRECTIVES:\n"
         f"1. SELF-SUFFICIENT VISUALS: Every image prompt MUST describe a professional infographic with text, diagrams, and data. "
         f"The visual MUST stand on its own.\n"
-        f"2. LONG-FORM NARRATION: Each voiceover script MUST be a detailed educational segment (150-200 words). "
-        f"Explain concepts in depth. Do NOT be concise. We want the user to fully understand the context.\n"
+        f"2. NARRATION: Each voiceover script MUST be approximately {words_per_slide} words. "
+        f"Explain concepts in depth. Ensure the total word count across all slides hits the ~{total_word_target} mark.\n"
         f"3. ENGAGING FLOW: Design a logical progression from introduction -> core concepts -> deep dives -> conclusion.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
@@ -91,7 +93,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"  \"slides\": [\n"
         f"    {{\n"
         f"      \"image_prompt\": \"[Infographic layout for {company_name} with specific diagrams and data points]\",\n"
-        f"      \"script\": \"[Detailed 150-200 word educational narration...]\",\n"
+        f"      \"script\": \"[Narrative of approx {words_per_slide} words...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
@@ -108,19 +110,99 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
                 response_mime_type="application/json",
             ),
         )
-        
+
         # Verify JSON
         storyboard_data = json.loads(response.text)
         return storyboard_data
     except Exception as e:
-        log_message(f"Long-form storyboard generation failed: {e}", Severity.ERROR)
+        log_message(f"Storyboard generation failed: {e}", Severity.ERROR)
         return {"error": str(e)}
 
-async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates all media assets and compiles a final educational video. Overlays brand logo."""
+async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
+    """Generates actual images and voiceover audio for each slide for user review."""
     current_output_folder = set_output_folder(tool_context)
-    log_message("Producing branded slidecast video assets...", Severity.INFO)
-    
+    log_message("Generating asset previews for the storyboard...", Severity.INFO)
+
+    try:
+        sb = SlidecastStoryboard.model_validate(storyboard)
+    except Exception as e:
+        return {"status": "error", "details": f"Invalid storyboard format: {e}"}
+
+    # Process slides in parallel
+    async def process_slide(slide: SlidecastSlide, idx: int):
+        log_message(f"Rendering preview for slide {idx+1}...", Severity.INFO)
+        # 1. Generate Image
+        img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image")
+        if not img_bytes:
+            raise ValueError(f"Failed to generate image for slide {idx+1}")
+
+        # Save image as artifact
+        img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
+        saved_img = await utils_agents.save_to_artifact_and_render_asset(
+            asset=img_media, context=tool_context, save_in_gcs=True, gcs_folder=current_output_folder
+        )
+        slide.image_url = get_public_url(saved_img.gcs_uri)
+
+        # 2. Generate Voiceover
+        vo_bytes = await _generate_voiceover_audio(slide.script)
+        if not vo_bytes:
+            raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
+
+        # Save audio as artifact
+        aud_media = GeneratedMedia(filename=f"audio_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
+        saved_aud = await utils_agents.save_to_artifact_and_render_asset(
+            asset=aud_media, context=tool_context, save_in_gcs=True, gcs_folder=current_output_folder
+        )
+        slide.audio_url = get_public_url(saved_aud.gcs_uri)
+
+        return slide
+
+    try:
+        slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
+        sb.slides = await asyncio.gather(*slide_tasks)
+
+        return {
+            "status": "success",
+            "message": "Assets generated. Please review the images and audio scripts below.",
+            "storyboard": sb.model_dump()
+        }
+    except Exception as e:
+        log_message(f"Preview generation failed: {e}", Severity.ERROR)
+        return {"status": "error", "details": str(e)}
+
+async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
+    """Compiles the approved assets into a final educational video with background music and logo."""
+    current_output_folder = set_output_folder(tool_context)
+    log_message("Finalizing slidecast video production...", Severity.INFO)
+
+    try:
+        sb = SlidecastStoryboard.model_validate(storyboard)
+    except Exception as e:
+        return {"status": "error", "details": f"Invalid storyboard format: {e}"}
+
+    # Download/Prepare bytes for compilation
+    slides_data = []
+    for i, slide in enumerate(sb.slides):
+        if not slide.image_url or not slide.audio_url:
+            return {"status": "error", "details": f"Slide {i+1} is missing generated assets. Run preview first."}
+
+        # Load from GCS/Cache
+        img_res = await utils_agents.load_resource(slide.image_url, tool_context)
+        aud_res = await utils_agents.load_resource(slide.audio_url, tool_context)
+
+        if not img_res or not aud_res:
+             return {"status": "error", "details": f"Failed to retrieve assets for slide {i+1}."}
+
+        slides_data.append({
+            "image_bytes": img_res.media_bytes,
+            "audio_bytes": aud_res.media_bytes,
+            "text_overlay": "" 
+        })
+
+    # Music & Logo
+    music_prompt = sb.music_prompt or "Cinematic instrumental background music"
+    music_bytes = await _generate_lyria_music(music_prompt, sb.title)
+
     logo_bytes = None
     logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
     if logo_uri:
@@ -129,83 +211,24 @@ async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -
             if res: logo_bytes = res.media_bytes
         except Exception: pass
 
-    try:
-        sb = SlidecastStoryboard.model_validate(storyboard)
-    except Exception as e:
-        return {"status": "error", "details": f"Invalid storyboard format: {e}"}
-
-    slides_data = []
-    
-    # Process slides in parallel for speed
-    async def process_slide(slide: SlidecastSlide, idx: int):
-        log_message(f"Generating assets for slide {idx+1}...", Severity.INFO)
-        # Generate image (which now contains text/infographics)
-        img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image")
-        if not img_bytes:
-            log_message(f"Image generation failed for slide {idx+1}", Severity.ERROR)
-            raise ValueError(f"Failed to generate image for slide {idx+1}")
-
-        # Generate detailed voiceover
-        vo_bytes = await _generate_voiceover_audio(slide.script)
-        if not vo_bytes:
-            log_message(f"Voiceover generation failed for slide {idx+1}", Severity.ERROR)
-            raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
-
-        log_message(f"Slide {idx+1} assets ready. Image: {len(img_bytes)} bytes, VO: {len(vo_bytes)} bytes", Severity.INFO)
-        return {
-            "image_bytes": img_bytes,
-            "audio_bytes": vo_bytes,
-            "text_overlay": "" 
-        }
-
-    try:
-        slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
-        slides_data = await asyncio.gather(*slide_tasks)
-    except Exception as e:
-        log_message(f"Asset generation failed: {e}", Severity.ERROR)
-        return {"status": "error", "details": f"Asset generation failed: {e}"}
-
-    # Generate music
-    music_prompt = sb.music_prompt or "Cinematic instrumental background music"
-    log_message(f"Generating background music: {music_prompt}...", Severity.INFO)
-    music_bytes = await _generate_lyria_music(music_prompt, sb.title)
-    if music_bytes:
-        log_message(f"Music generated: {len(music_bytes)} bytes", Severity.INFO)
-    else:
-        log_message("Music generation returned None, proceeding without background music.", Severity.WARNING)
-
-    # Compile video
-    log_message("Compiling video...", Severity.INFO)
-
+    # Compile
     video_bytes = compile_slidecast_video(slides_data)
-    
     if not video_bytes:
         return {"status": "error", "details": "Failed to compile slidecast video."}
 
-    # Mix music
     if music_bytes:
-        log_message("Mixing background music...", Severity.INFO)
         video_bytes = mix_audio_onto_video(video_bytes, None, music_bytes)
 
-    # Overlay Logo
     if logo_bytes:
-        log_message("Overlaying brand logo...", Severity.INFO)
         video_bytes = overlay_logo_on_video(video_bytes, logo_bytes)
 
-    # Save to artifacts/GCS
-    filename = f"slidecast_video_{int(time.time())}.mp4"
+    # Save final video
+    filename = f"slidecast_final_{int(time.time())}.mp4"
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=video_bytes)
-    
-    try:
-        # Use utils_agents helper to store and return the url
-        saved_media = await utils_agents.save_to_artifact_and_render_asset(
-            asset=video_media, 
-            context=tool_context, 
-            save_in_gcs=True, 
-            save_in_artifacts=True, 
-            gcs_folder=current_output_folder
-        )
-        url = get_public_url(saved_media.gcs_uri)
-        return {"status": "success", "video_url": url, "details": "Slidecast generated successfully."}
-    except Exception as e:
-         return {"status": "error", "details": f"Failed to save video: {e}"}
+
+    saved_video = await utils_agents.save_to_artifact_and_render_asset(
+        asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+    )
+    url = get_public_url(saved_video.gcs_uri)
+    return {"status": "success", "video_url": url, "details": "Slidecast masterclass finalized and ready for viewing."}
+

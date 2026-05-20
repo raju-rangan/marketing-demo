@@ -238,10 +238,13 @@ class SlidecastSlide(BaseModel):
     image_prompt: str
     script: str
     text_overlay: Optional[str] = None
+    image_url: Optional[str] = None
+    audio_url: Optional[str] = None
 
 class SlidecastStoryboard(BaseModel):
     title: str
     slides: List[SlidecastSlide]
     music_prompt: Optional[str] = "Cinematic and educational background music"
+    video_url: Optional[str] = None
 
 
