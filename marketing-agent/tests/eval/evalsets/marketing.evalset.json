@@ -1,0 +1,96 @@
+{
+  "eval_set_id": "marketing_workflow_eval",
+  "name": "JPMC Marketing Workflow Evaluation",
+  "description": "Comprehensive evaluation of the JPMC Marketing Assistant's ability to ideate, storyboard, and produce cinematic campaigns while maintaining brand integrity.",
+  "eval_cases": [
+    {
+      "eval_id": "autopilot_sapphire_luxury",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Autopilot: Pitch me a Sapphire Reserve campaign for luxury jetsetters"}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "brand_integrity_chase",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "I want to launch a campaign for Chase Sapphire Reserve. Give me some ideas."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "brand_integrity_jpm",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Set up a Private Wealth campaign for ultra high net worth individuals. Aesthetic should be quiet luxury."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "storyboard_generation_24s",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Generate a 24-second cinematic storyboard for a Chase Freedom Unlimited campaign focused on young families starting their journey."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {
+           "PRODUCT_COMPANY_NAME": "Chase",
+           "PRODUCT_NAME": "Freedom Unlimited"
+        }
+      }
+    },
+    {
+      "eval_id": "video_production_request",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "The storyboard looks great. Please produce the final 32-second VEO commercial with voiceover and captions."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {
+          "STORYLINE_DATA": {
+            "storyline": "Your journey begins today. With Chase Freedom Unlimited, every moment counts.",
+            "acts": [
+              {"act_number": 1, "scene_description": "Family in park", "voiceover": "Your journey begins today."},
+              {"act_number": 2, "scene_description": "Close up of card", "voiceover": "With Chase Freedom Unlimited, every moment counts."}
+            ]
+          },
+          "STORYBOARD_KEYFRAMES": ["gs://bucket/f1.png", "gs://bucket/f2.png"],
+          "PRODUCT_COMPANY_NAME": "Chase",
+          "PRODUCT_NAME": "Freedom Unlimited"
+        }
+      }
+    }
+  ]
+}
