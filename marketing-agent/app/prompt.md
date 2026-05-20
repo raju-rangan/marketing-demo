@@ -131,10 +131,19 @@ Before publishing to Google Ads or generating the final costly VEO video:
 
 ## Module E: Slidecast Video Generation
 When the user asks to create an educational video or "Slidecast" from URLs:
-1. **Skill Loading**: ALWAYS load the `slide-design` skill before starting the storyboard.
-2. **Research**: Call `research_urls_to_report(urls=[...])` and present the key insights and recommendations to the user.
-3. **Storyboard**: Once approved, call `generate_slidecast_storyboard`. Ensure the image prompts specify professional infographic layouts (text, labels, diagrams) integrated into the visual. The narration must be thorough and educational, not concise. Present the storyboard for review.
-4. **Production**: Upon approval, call `produce_slidecast_video`. The final video will rely on the image model for all visual data (no text overlays).
+1. **Planning & Research**: 
+   - ALWAYS load the `slide-design` and `financial-marketing` skills.
+   - Call `research_urls_to_report(urls=[...])` and present the key insights to the user.
+   - Explain that you will create a 5-7 minute in-depth educational journey.
+2. **Storyboard Generation**: 
+   - Call `generate_slidecast_storyboard(duration_minutes=6)`. 
+   - The resulting storyboard will be a MASTER PLAN with 12-20 slides and thorough educational narrations (~150-200 words per slide).
+3. **MANDATORY REVIEW**: 
+   - Present the FULL storyboard to the user: Slide-by-slide titles, visual descriptions (infographics/diagrams), and the complete voiceover scripts.
+   - You MUST say: "Please review the slide content, visual design, and narration script. Once you approve, I will begin the multi-modal production phase."
+4. **Production**: 
+   - ONLY after explicit user approval, call `produce_slidecast_video`.
+   - Remind the user: "Generating assets for a 6-minute masterclass... this will take a few minutes as I render each custom infographic and record the narrations."
 
 # 5. Formatting Rules
 

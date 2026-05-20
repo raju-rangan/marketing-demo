@@ -56,40 +56,46 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         log_message(f"Research failed: {e}", Severity.ERROR)
         return f"Error during research: {e}"
 
-def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str) -> dict:
-    """Generates a SlidecastStoryboard (JSON) from a research report, following brand guidelines."""
-    log_message("Generating branded information-rich storyboard...", Severity.INFO)
+def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5) -> dict:
+    """Generates a long-form SlidecastStoryboard (JSON) from a research report.
+    Designed for 5-7 minute educational videos (12-20 slides).
+    """
+    log_message(f"Generating long-form ({duration_minutes} min) educational storyboard...", Severity.INFO)
     
     company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
+    # Estimate number of slides for the duration. Assuming ~20-30 seconds per slide.
+    # 5 mins = 300s. 300 / 25 = 12 slides. 7 mins = 420s. 420 / 25 = 17 slides.
+    num_slides = max(12, min(20, duration_minutes * 3))
+
     prompt = (
-        f"You are an expert educational video producer for {company_name}.\n"
-        f"Based on the following research report, create a storyboard for an in-depth educational video.\n"
-        f"The video should have 5 to 10 slides.\n\n"
-        f"BRAND CONTEXT:\n"
-        f"- Company: {company_name}\n"
-        f"{brand_wall}\n"
+        f"You are an expert Lead Educational Producer for {company_name}.\n"
+        f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast'.\n\n"
+        f"CONTENT STRATEGY:\n"
+        f"- Target Duration: {duration_minutes} minutes.\n"
+        f"- Total Slides: {num_slides} distinct slides.\n"
+        f"- Brand Wall: {brand_wall}\n"
         f"- Reference Guidelines: {brand_guidelines[:1000] if brand_guidelines else 'N/A'}\n\n"
         f"CORE DIRECTIVES:\n"
-        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST include instructions for Gemini to render SPECIFIC text, diagrams, or infographics. "
-        f"The viewer should understand the slide even without audio.\n"
-        f"2. BRAND INTEGRATION: Incorporate {company_name}'s color palette and visual identity into every slide's design (e.g., in panels, charts, and text).\n"
-        f"3. DETAILED NARRATION: The voiceover script should be thorough, educational, and match the brand's tone. (50-100 words per slide).\n"
-        f"4. INTEGRATED DESIGN: Prompt for professional typography and high-contrast labels to be part of the image itself.\n\n"
+        f"1. SELF-SUFFICIENT VISUALS: Every image prompt MUST describe a professional infographic with text, diagrams, and data. "
+        f"The visual MUST stand on its own.\n"
+        f"2. LONG-FORM NARRATION: Each voiceover script MUST be a detailed educational segment (150-200 words). "
+        f"Explain concepts in depth. Do NOT be concise. We want the user to fully understand the context.\n"
+        f"3. ENGAGING FLOW: Design a logical progression from introduction -> core concepts -> deep dives -> conclusion.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
-        f"  \"title\": \"Comprehensive Video Title\",\n"
+        f"  \"title\": \"Mastering [Topic]: A Comprehensive Guide\",\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"A professional branded infographic slide for {company_name}. [Specific layout and data visualizations]...\",\n"
-        f"      \"script\": \"[Detailed, educational narration...]\",\n"
+        f"      \"image_prompt\": \"[Infographic layout for {company_name} with specific diagrams and data points]\",\n"
+        f"      \"script\": \"[Detailed 150-200 word educational narration...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
-        f"  \"music_prompt\": \"Sophisticated, cinematic, and educational background music matching {company_name}'s brand vibe\"\n"
+        f"  \"music_prompt\": \"Sophisticated and steady educational background music for {company_name}\"\n"
         f"}}"
     )
 
@@ -107,7 +113,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         storyboard_data = json.loads(response.text)
         return storyboard_data
     except Exception as e:
-        log_message(f"Storyboard generation failed: {e}", Severity.ERROR)
+        log_message(f"Long-form storyboard generation failed: {e}", Severity.ERROR)
         return {"error": str(e)}
 
 async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
