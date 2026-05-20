@@ -12,6 +12,9 @@ from google.genai import types
 
 from .state import (
     GOOGLE_CLOUD_PROJECT,
+    PRODUCT_COMPANY_NAME_STATE_KEY,
+    REFERENCE_GUIDELINES_STATE_KEY,
+    LOGO_IMAGE_URI_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
 from .schema import SlidecastStoryboard, SlidecastSlide
@@ -20,8 +23,9 @@ from .tools_media import (
     _generate_gemini_image,
     _generate_voiceover_audio,
     _generate_lyria_music,
+    _get_brand_wall_directive,
 )
-from shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video
+from shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
 
 # Initialize GenAI Client
 client = genai.Client(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location="global")
@@ -53,30 +57,39 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         return f"Error during research: {e}"
 
 def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str) -> dict:
-    """Generates a SlidecastStoryboard (JSON) from a research report with a focus on information-rich visuals."""
-    log_message("Generating information-rich storyboard from research report...", Severity.INFO)
+    """Generates a SlidecastStoryboard (JSON) from a research report, following brand guidelines."""
+    log_message("Generating branded information-rich storyboard...", Severity.INFO)
     
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
+    brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
+    brand_wall = _get_brand_wall_directive(company_name)
+
     prompt = (
-        f"You are an expert educational video producer specializing in 'Self-Sufficient Visuals'.\n"
+        f"You are an expert educational video producer for {company_name}.\n"
         f"Based on the following research report, create a storyboard for an in-depth educational video.\n"
         f"The video should have 5 to 10 slides.\n\n"
+        f"BRAND CONTEXT:\n"
+        f"- Company: {company_name}\n"
+        f"{brand_wall}\n"
+        f"- Reference Guidelines: {brand_guidelines[:1000] if brand_guidelines else 'N/A'}\n\n"
         f"CORE DIRECTIVES:\n"
         f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST include instructions for Gemini to render SPECIFIC text, diagrams, or infographics. "
-        f"The viewer should understand the slide even without audio. Include layout instructions (e.g., 'Split screen with a diagram on the right').\n"
-        f"2. DETAILED NARRATION: The voiceover script should be thorough and educational. Do not be concise. Explain the 'why' and 'how'. (50-100 words per slide).\n"
-        f"3. INTEGRATED DESIGN: Prompt for professional typography and high-contrast labels to be part of the image itself.\n\n"
+        f"The viewer should understand the slide even without audio.\n"
+        f"2. BRAND INTEGRATION: Incorporate {company_name}'s color palette and visual identity into every slide's design (e.g., in panels, charts, and text).\n"
+        f"3. DETAILED NARRATION: The voiceover script should be thorough, educational, and match the brand's tone. (50-100 words per slide).\n"
+        f"4. INTEGRATED DESIGN: Prompt for professional typography and high-contrast labels to be part of the image itself.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
         f"  \"title\": \"Comprehensive Video Title\",\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"A professional infographic slide. On the left, [Visual Illustration]. On the right, a clean panel with the title '[Main Heading]' and 3 bullet points: [Point 1], [Point 2], [Point 3]. Large bold typography, 4k, clean finance aesthetic.\",\n"
-        f"      \"script\": \"[Detailed, multi-sentence educational narration that expands on the visual points...]\",\n"
+        f"      \"image_prompt\": \"A professional branded infographic slide for {company_name}. [Specific layout and data visualizations]...\",\n"
+        f"      \"script\": \"[Detailed, educational narration...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
-        f"  \"music_prompt\": \"Sophisticated, cinematic, and educational background music\"\n"
+        f"  \"music_prompt\": \"Sophisticated, cinematic, and educational background music matching {company_name}'s brand vibe\"\n"
         f"}}"
     )
 
@@ -98,10 +111,18 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         return {"error": str(e)}
 
 async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates all media assets and compiles a final educational video. Images contain all text/data."""
+    """Generates all media assets and compiles a final educational video. Overlays brand logo."""
     current_output_folder = set_output_folder(tool_context)
-    log_message("Producing information-rich slidecast video assets...", Severity.INFO)
+    log_message("Producing branded slidecast video assets...", Severity.INFO)
     
+    logo_bytes = None
+    logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+    if logo_uri:
+        try:
+            res = await utils_agents.load_resource(logo_uri, tool_context)
+            if res: logo_bytes = res.media_bytes
+        except Exception: pass
+
     try:
         sb = SlidecastStoryboard.model_validate(storyboard)
     except Exception as e:
@@ -150,6 +171,11 @@ async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -
     if music_bytes:
         log_message("Mixing background music...", Severity.INFO)
         video_bytes = mix_audio_onto_video(video_bytes, None, music_bytes)
+
+    # Overlay Logo
+    if logo_bytes:
+        log_message("Overlaying brand logo...", Severity.INFO)
+        video_bytes = overlay_logo_on_video(video_bytes, logo_bytes)
 
     # Save to artifacts/GCS
     filename = f"slidecast_video_{int(time.time())}.mp4"
