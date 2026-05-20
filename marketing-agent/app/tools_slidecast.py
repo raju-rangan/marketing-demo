@@ -58,11 +58,11 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
 
 def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5) -> dict:
     """Generates a long-form SlidecastStoryboard (JSON) from a research report.
-    Targets 160 words per minute (WPM) for precise duration control.
+    Enforces a Title Slide for Slide 1 and targets 160 WPM.
     """
-    log_message(f"Generating storyboard for {duration_minutes} min video (~160 WPM target)...", Severity.INFO)
+    log_message(f"Generating branded storyboard for {duration_minutes} min video...", Severity.INFO)
 
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
@@ -74,31 +74,37 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
         f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast'.\n\n"
+        f"STRUCTURE REQUIREMENTS:\n"
+        f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic and a welcoming, high-level introduction narration.\n"
+        f"- TOTAL SLIDES: {num_slides} slides total.\n"
+        f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt.\n\n"
         f"DURATION & WORD COUNT TARGETS:\n"
         f"- Target Duration: {duration_minutes} minutes.\n"
-        f"- Total Word Count: Approximately {total_word_target} words total (speaking rate: 160 WPM).\n"
-        f"- Total Slides: {num_slides} distinct slides.\n\n"
+        f"- Total Word Count: ~{total_word_target} words (speaking rate: 160 WPM).\n"
+        f"- Target per slide: ~{words_per_slide} words of detailed narration.\n\n"
         f"CORE DIRECTIVES:\n"
-        f"1. SELF-SUFFICIENT VISUALS: Every image prompt MUST describe a professional infographic with text, diagrams, and data. "
-        f"2. LOGO INTEGRATION: Every image prompt MUST explicitly include: 'Include the {company_name} logo in the bottom right corner'.\n"
-        f"3. NARRATION: Each voiceover script MUST be approximately {words_per_slide} words. "
-        f"Explain concepts in depth. Do NOT be concise.\n"
-        f"4. BRANDING: Use {company_name}'s color palette for all charts and panels.\n\n"
+        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data.\n"
+        f"2. NARRATION: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words). Do NOT be concise.\n"
+        f"3. BRANDING: Use {company_name}'s color palette (e.g., Chase Blue/White) for all designs.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
-        f"  \"title\": \"Mastering [Topic]: A Comprehensive Guide\",\n"
+        f"  \"title\": \"Comprehensive Title\",\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"A branded infographic for {company_name}... Include the {company_name} logo in the bottom right corner.\",\n"
-        f"      \"script\": \"[Narrative of approx {words_per_slide} words...]\",\n"
+        f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography. Include logo in bottom right.]\",\n"
+        f"      \"script\": \"[Introductory narration of approx {words_per_slide} words...]\",\n"
+        f"      \"text_overlay\": \"\" \n"
+        f"    }},\n"
+        f"    {{\n"
+        f"      \"image_prompt\": \"[Infographic layout...]\",\n"
+        f"      \"script\": \"[Detailed educational narration...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
-        f"  \"music_prompt\": \"Sophisticated and steady educational background music for {company_name}\"\n"
+        f"  \"music_prompt\": \"Sophisticated, cinematic educational background music\"\n"
         f"}}"
     )
-
     try:
         response = client.models.generate_content(
             model="gemini-3.1-pro-preview",
@@ -123,6 +129,11 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
 
     logo_bytes = []
     logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+    
+    # Fallback to the provided Chase logo URL if no logo is in state
+    if not logo_uri:
+        logo_uri = "gs://cs-poc-edgd4dliruu2xvksuvo4r3g-artifacts/samples/chase_logo.png"
+    
     if logo_uri:
         try:
             res = await utils_agents.load_resource(logo_uri, tool_context)
@@ -212,6 +223,11 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
 
     logo_bytes = None
     logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+    
+    # Fallback to the provided Chase logo URL
+    if not logo_uri:
+        logo_uri = "gs://cs-poc-edgd4dliruu2xvksuvo4r3g-artifacts/samples/chase_logo.png"
+
     if logo_uri:
         try:
             res = await utils_agents.load_resource(logo_uri, tool_context)

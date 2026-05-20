@@ -137,6 +137,8 @@ When the user asks to create an educational video or "Slidecast" from URLs:
 2. **Master Plan Generation**: 
    - Call `generate_slidecast_storyboard(duration_minutes=6)`. 
    - This targets a **160 WPM speaking rate** (~800-1000 words total for a 5-7 min video).
+   - **STRUCTURAL MANDATE**: Slide 1 MUST be a **Title Slide** with a bold cinematic title and a high-level introductory narration.
+   - **VISUAL MANDATE**: Every slide prompt MUST explicitly instruct the model to include the **exact Chase logo in the bottom right corner**.
    - Present the slide sequence and narration scripts to the user.
 3. **Asset Preview (MANDATORY)**: 
    - Once the user approves the text-based plan, call `preview_slidecast_assets`.
