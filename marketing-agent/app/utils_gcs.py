@@ -21,6 +21,7 @@ from .state import (
     OUTPUT_FOLDER,
 )
 from .adk_common.utils.utils_logging import Severity, log_message
+from .adk_common.utils import utils_agents
 
 def get_public_url(blob_path: str) -> str:
     """Returns a CDN URL if CDN_HOST is set. Otherwise, generates a secure Signed URL."""
@@ -40,49 +41,50 @@ def get_public_url(blob_path: str) -> str:
         bucket = storage_client.bucket(GOOGLE_CLOUD_BUCKET_ARTIFACTS)
         blob = bucket.blob(blob_path)
         
-        # Valid for 7 days
+        # Valid for 7 days (as requested for TTL)
         return blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(days=7),
             method="GET",
         )
     except Exception as e:
-        # Fallback to standard URL if signing fails (common with User Credentials)
+        # Fallback to standard URL if signing fails
         return f"https://storage.googleapis.com/{GOOGLE_CLOUD_BUCKET_ARTIFACTS}/{blob_path}"
 
 def set_output_folder(tool_context):
-    """Sets global OUTPUT_FOLDER to {product_name}_{persona}/."""
+    """Sets global OUTPUT_FOLDER to {session_id}/{product_name}_{persona}/ for isolation."""
     global OUTPUT_FOLDER
-    product_name = tool_context.state.get("PRODUCT_NAME", "")
+    
+    # 1. Isolate by Session ID
+    session_id = utils_agents.get_unique_session_id(tool_context) or "default_session"
+    
+    product_name = tool_context.state.get("PRODUCT_NAME", "default_product")
     persona_desc = tool_context.state.get("CUSTOMER_PERSONA", "")
-    if product_name:
-        safe_name = product_name.replace(" ", "_").replace("/", "_")[:40]
-        if persona_desc:
-            persona_map = {
-                "family": "Family_with_Kids",
-                "vacation": "Travel_Enthusiast",
-                "travel": "Travel_Enthusiast",
-                "young": "Young_Professional",
-                "professional": "Young_Professional",
-                "fitness": "Fitness_Wellness",
-                "wellness": "Fitness_Wellness",
-                "luxury": "Luxury_Premium",
-                "premium": "Luxury_Premium",
-            }
-            matched = None
-            for keyword, folder_name in persona_map.items():
-                if keyword in persona_desc.lower():
-                    matched = folder_name
-                    break
-            if matched:
-                new_folder = f"{safe_name}_{matched}"
-            else:
-                safe_persona = persona_desc.split(".")[0].replace(" ", "_").replace(",", "")[:30]
-                new_folder = f"{safe_name}_{safe_persona}"
+    
+    safe_name = product_name.replace(" ", "_").replace("/", "_")[:40]
+    if persona_desc:
+        persona_map = {
+            "family": "Family_with_Kids",
+            "travel": "Travel_Enthusiast",
+            "professional": "Young_Professional",
+            "fitness": "Fitness_Wellness",
+            "luxury": "Luxury_Premium",
+        }
+        matched = None
+        for keyword, folder_name in persona_map.items():
+            if keyword in persona_desc.lower():
+                matched = folder_name
+                break
+        if matched:
+            sub_folder = f"{safe_name}_{matched}"
         else:
-            new_folder = safe_name
-        
-        tool_context.state["CURRENT_OUTPUT_FOLDER"] = new_folder
-        log_message(f"Output folder: {new_folder}", Severity.INFO)
-        return new_folder
-    return OUTPUT_FOLDER
+            safe_persona = persona_desc.split(".")[0].replace(" ", "_").replace(",", "")[:30]
+            sub_folder = f"{safe_name}_{safe_persona}"
+    else:
+        sub_folder = safe_name
+    
+    # Final isolated path: session_id/folder_structure
+    new_folder = f"{session_id}/{sub_folder}"
+    tool_context.state["CURRENT_OUTPUT_FOLDER"] = new_folder
+    log_message(f"Output folder isolated by session: {new_folder}", Severity.INFO)
+    return new_folder
