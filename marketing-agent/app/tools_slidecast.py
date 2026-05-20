@@ -66,9 +66,8 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
-    # Calculate total word target: 5 mins * 160 WPM = 800 words.
+    # Calculate total word target
     total_word_target = duration_minutes * 160
-    # Estimate number of slides. ~15 slides for 5-7 mins.
     num_slides = max(12, min(20, duration_minutes * 3))
     words_per_slide = total_word_target // num_slides
 
@@ -78,21 +77,20 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"DURATION & WORD COUNT TARGETS:\n"
         f"- Target Duration: {duration_minutes} minutes.\n"
         f"- Total Word Count: Approximately {total_word_target} words total (speaking rate: 160 WPM).\n"
-        f"- Total Slides: {num_slides} distinct slides.\n"
-        f"- Target per slide: ~{words_per_slide} words of narration.\n\n"
+        f"- Total Slides: {num_slides} distinct slides.\n\n"
         f"CORE DIRECTIVES:\n"
         f"1. SELF-SUFFICIENT VISUALS: Every image prompt MUST describe a professional infographic with text, diagrams, and data. "
-        f"The visual MUST stand on its own.\n"
-        f"2. NARRATION: Each voiceover script MUST be approximately {words_per_slide} words. "
-        f"Explain concepts in depth. Ensure the total word count across all slides hits the ~{total_word_target} mark.\n"
-        f"3. ENGAGING FLOW: Design a logical progression from introduction -> core concepts -> deep dives -> conclusion.\n\n"
+        f"2. LOGO INTEGRATION: Every image prompt MUST explicitly include: 'Include the {company_name} logo in the bottom right corner'.\n"
+        f"3. NARRATION: Each voiceover script MUST be approximately {words_per_slide} words. "
+        f"Explain concepts in depth. Do NOT be concise.\n"
+        f"4. BRANDING: Use {company_name}'s color palette for all charts and panels.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
         f"  \"title\": \"Mastering [Topic]: A Comprehensive Guide\",\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"[Infographic layout for {company_name} with specific diagrams and data points]\",\n"
+        f"      \"image_prompt\": \"A branded infographic for {company_name}... Include the {company_name} logo in the bottom right corner.\",\n"
         f"      \"script\": \"[Narrative of approx {words_per_slide} words...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
@@ -119,9 +117,19 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         return {"error": str(e)}
 
 async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates actual images and voiceover audio for each slide for user review."""
+    """Generates actual images (with logo rendered by the model) and voiceover audio for review."""
     current_output_folder = set_output_folder(tool_context)
-    log_message("Generating asset previews for the storyboard...", Severity.INFO)
+    log_message("Generating asset previews (including native logo rendering)...", Severity.INFO)
+
+    logo_bytes = []
+    logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+    if logo_uri:
+        try:
+            res = await utils_agents.load_resource(logo_uri, tool_context)
+            if res and res.media_bytes:
+                logo_bytes = [res.media_bytes]
+        except Exception as e:
+            log_message(f"Warning: Could not load logo as reference image: {e}", Severity.WARNING)
 
     try:
         sb = SlidecastStoryboard.model_validate(storyboard)
@@ -131,8 +139,8 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
     # Process slides in parallel
     async def process_slide(slide: SlidecastSlide, idx: int):
         log_message(f"Rendering preview for slide {idx+1}...", Severity.INFO)
-        # 1. Generate Image
-        img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image")
+        # 1. Generate Image (passing logo as reference)
+        img_bytes = await _generate_gemini_image(slide.image_prompt, logo_bytes, label=f"slide_{idx+1}_image")
         if not img_bytes:
             raise ValueError(f"Failed to generate image for slide {idx+1}")
 
@@ -156,7 +164,6 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         slide.audio_url = get_public_url(saved_aud.gcs_uri)
 
         return slide
-
     try:
         slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
         sb.slides = await asyncio.gather(*slide_tasks)
