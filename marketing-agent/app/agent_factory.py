@@ -121,6 +121,7 @@ marketing_skills = SkillToolset(
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "platform-specs")),
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "financial-marketing")),
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "website-design")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "slide-design")),
     ],
 )
 

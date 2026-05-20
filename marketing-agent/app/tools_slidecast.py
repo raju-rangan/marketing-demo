@@ -53,29 +53,30 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         return f"Error during research: {e}"
 
 def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str) -> dict:
-    """Generates a SlidecastStoryboard (JSON) from a research report."""
-    log_message("Generating storyboard from research report...", Severity.INFO)
+    """Generates a SlidecastStoryboard (JSON) from a research report with a focus on information-rich visuals."""
+    log_message("Generating information-rich storyboard from research report...", Severity.INFO)
     
     prompt = (
-        f"You are an expert educational video producer.\n"
-        f"Based on the following research report, create a compelling storyboard for a short educational video.\n"
-        f"The video should have 4 to 8 slides.\n"
-        f"For each slide, provide:\n"
-        f"1. A detailed image prompt for a photorealistic or high-quality illustration.\n"
-        f"2. An engaging voiceover script (20-40 words per slide).\n"
-        f"3. A concise text overlay (2-6 words) that highlights the main point.\n\n"
+        f"You are an expert educational video producer specializing in 'Self-Sufficient Visuals'.\n"
+        f"Based on the following research report, create a storyboard for an in-depth educational video.\n"
+        f"The video should have 5 to 10 slides.\n\n"
+        f"CORE DIRECTIVES:\n"
+        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST include instructions for Gemini to render SPECIFIC text, diagrams, or infographics. "
+        f"The viewer should understand the slide even without audio. Include layout instructions (e.g., 'Split screen with a diagram on the right').\n"
+        f"2. DETAILED NARRATION: The voiceover script should be thorough and educational. Do not be concise. Explain the 'why' and 'how'. (50-100 words per slide).\n"
+        f"3. INTEGRATED DESIGN: Prompt for professional typography and high-contrast labels to be part of the image itself.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
-        f"  \"title\": \"Video Title\",\n"
+        f"  \"title\": \"Comprehensive Video Title\",\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"Cinematic shot of...\",\n"
-        f"      \"script\": \"Welcome to our deep dive...\",\n"
-        f"      \"text_overlay\": \"The Beginning\"\n"
+        f"      \"image_prompt\": \"A professional infographic slide. On the left, [Visual Illustration]. On the right, a clean panel with the title '[Main Heading]' and 3 bullet points: [Point 1], [Point 2], [Point 3]. Large bold typography, 4k, clean finance aesthetic.\",\n"
+        f"      \"script\": \"[Detailed, multi-sentence educational narration that expands on the visual points...]\",\n"
+        f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
-        f"  \"music_prompt\": \"Upbeat educational electronic background music\"\n"
+        f"  \"music_prompt\": \"Sophisticated, cinematic, and educational background music\"\n"
         f"}}"
     )
 
@@ -97,9 +98,9 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         return {"error": str(e)}
 
 async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates all media assets and compiles a final educational video based on a storyboard."""
+    """Generates all media assets and compiles a final educational video. Images contain all text/data."""
     current_output_folder = set_output_folder(tool_context)
-    log_message("Producing slidecast video assets...", Severity.INFO)
+    log_message("Producing information-rich slidecast video assets...", Severity.INFO)
     
     try:
         sb = SlidecastStoryboard.model_validate(storyboard)
@@ -111,12 +112,12 @@ async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -
     # Process slides in parallel for speed
     async def process_slide(slide: SlidecastSlide, idx: int):
         log_message(f"Generating assets for slide {idx+1}...", Severity.INFO)
-        # Generate image
+        # Generate image (which now contains text/infographics)
         img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image")
         if not img_bytes:
             raise ValueError(f"Failed to generate image for slide {idx+1}")
             
-        # Generate voiceover
+        # Generate detailed voiceover
         vo_bytes = await _generate_voiceover_audio(slide.script)
         if not vo_bytes:
             raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
@@ -124,7 +125,7 @@ async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -
         return {
             "image_bytes": img_bytes,
             "audio_bytes": vo_bytes,
-            "text_overlay": slide.text_overlay or ""
+            "text_overlay": ""  # Explicitly empty: the image model handles text now
         }
 
     try:
