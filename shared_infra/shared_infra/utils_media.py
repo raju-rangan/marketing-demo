@@ -130,7 +130,8 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             with open(vo_path, "wb") as f:
                 f.write(voiceover_bytes)
             inputs.extend(["-i", vo_path])
-            vo_idx = len(inputs) - 1
+            # Correctly calculate the input index (0-based)
+            vo_idx = (len(inputs) // 2) - 1
             filter_complex.append(f"[{vo_idx}:a]volume=1.0[vo]")
             audio_sources.append("[vo]")
         elif has_orig_audio:
@@ -144,7 +145,8 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             with open(music_path, "wb") as f:
                 f.write(music_bytes)
             inputs.extend(["-i", music_path])
-            music_idx = len(inputs) - 1
+            # Correctly calculate the input index (0-based)
+            music_idx = (len(inputs) // 2) - 1
             filter_complex.append(f"[{music_idx}:a]volume=0.15[bgm]")
             audio_sources.append("[bgm]")
 
@@ -180,7 +182,7 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             return video_bytes
 
 def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.4) -> bytes:
-    """Overlays a logo in the top-right corner of the video."""
+    """Overlays a logo in the bottom-right corner of the video."""
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")
         logo_path = os.path.join(tmpdir, "logo.png")
@@ -188,12 +190,12 @@ def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float 
         with open(logo_path, "wb") as f: f.write(logo_bytes)
 
         output_path = os.path.join(tmpdir, "watermarked.mp4")
-        # Scale logo to 150px width, set opacity, and place in top-right with 20px padding
+        # Scale logo to 150px width, set opacity, and place in bottom-right with 20px padding
         cmd = [
             FFMPEG_EXE, "-y", "-i", video_path, "-i", logo_path,
             "-filter_complex", 
             f"[1:v]scale=150:-1,format=rgba,colorchannelmixer=aa={opacity}[logo];"
-            f"[0:v][logo]overlay=W-w-20:20",
+            f"[0:v][logo]overlay=W-w-20:H-h-20",
             "-c:a", "copy", output_path
         ]
         try:
