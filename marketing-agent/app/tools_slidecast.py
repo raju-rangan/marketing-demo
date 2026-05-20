@@ -136,32 +136,41 @@ async def produce_slidecast_video(tool_context: ToolContext, storyboard: dict) -
         # Generate image (which now contains text/infographics)
         img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image")
         if not img_bytes:
+            log_message(f"Image generation failed for slide {idx+1}", Severity.ERROR)
             raise ValueError(f"Failed to generate image for slide {idx+1}")
-            
+
         # Generate detailed voiceover
         vo_bytes = await _generate_voiceover_audio(slide.script)
         if not vo_bytes:
+            log_message(f"Voiceover generation failed for slide {idx+1}", Severity.ERROR)
             raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
-            
+
+        log_message(f"Slide {idx+1} assets ready. Image: {len(img_bytes)} bytes, VO: {len(vo_bytes)} bytes", Severity.INFO)
         return {
             "image_bytes": img_bytes,
             "audio_bytes": vo_bytes,
-            "text_overlay": ""  # Explicitly empty: the image model handles text now
+            "text_overlay": "" 
         }
 
     try:
         slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
         slides_data = await asyncio.gather(*slide_tasks)
     except Exception as e:
+        log_message(f"Asset generation failed: {e}", Severity.ERROR)
         return {"status": "error", "details": f"Asset generation failed: {e}"}
 
     # Generate music
     music_prompt = sb.music_prompt or "Cinematic instrumental background music"
     log_message(f"Generating background music: {music_prompt}...", Severity.INFO)
     music_bytes = await _generate_lyria_music(music_prompt, sb.title)
+    if music_bytes:
+        log_message(f"Music generated: {len(music_bytes)} bytes", Severity.INFO)
+    else:
+        log_message("Music generation returned None, proceeding without background music.", Severity.WARNING)
 
     # Compile video
     log_message("Compiling video...", Severity.INFO)
+
     video_bytes = compile_slidecast_video(slides_data)
     
     if not video_bytes:

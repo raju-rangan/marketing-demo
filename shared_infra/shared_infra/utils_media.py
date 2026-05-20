@@ -92,9 +92,23 @@ def stitch_videos(clip_bytes_list: list[bytes]) -> bytes | None:
             log_message(f"ffmpeg stitching failed: {e.stderr.decode()}", Severity.ERROR)
             return None
 
+def has_audio(video_path: str) -> bool:
+    """Checks if a video file has an audio track."""
+    if not FFPROBE_EXE:
+        return False
+    try:
+        cmd = [
+            FFPROBE_EXE, "-v", "error", "-select_streams", "a",
+            "-show_entries", "stream=index", "-of", "csv=p=0", video_path
+        ]
+        output = subprocess.check_output(cmd).decode().strip()
+        return len(output) > 0
+    except Exception:
+        return False
+
 def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
                           music_bytes: bytes | None) -> bytes:
-    """Mixes voiceover and music onto a video file."""
+    """Mixes voiceover and music onto a video file, preserving original audio if no VO is provided."""
     if not voiceover_bytes and not music_bytes:
         return video_bytes
 
@@ -103,53 +117,65 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
         with open(video_path, "wb") as f:
             f.write(video_bytes)
 
+        has_orig_audio = has_audio(video_path)
+        log_message(f"Mixing audio. Original audio exists: {has_orig_audio}", Severity.INFO)
+
         inputs = ["-i", video_path]
         filter_complex = []
-        audio_count = 0
+        audio_sources = []
 
+        # 1. Handle original or provided voiceover
         if voiceover_bytes:
             vo_path = os.path.join(tmpdir, "vo.mp3")
             with open(vo_path, "wb") as f:
                 f.write(voiceover_bytes)
             inputs.extend(["-i", vo_path])
-            # Voiceover at 1.0 volume
-            filter_complex.append(f"[{audio_count+1}:a]volume=1.0[vo]")
-            audio_count += 1
+            vo_idx = len(inputs) - 1
+            filter_complex.append(f"[{vo_idx}:a]volume=1.0[vo]")
+            audio_sources.append("[vo]")
+        elif has_orig_audio:
+            # If no new VO provided, keep original audio
+            filter_complex.append(f"[0:a]volume=1.0[orig_a]")
+            audio_sources.append("[orig_a]")
 
+        # 2. Handle background music
         if music_bytes:
             music_path = os.path.join(tmpdir, "music.mp3")
             with open(music_path, "wb") as f:
                 f.write(music_bytes)
             inputs.extend(["-i", music_path])
-            # Music at 0.15 volume to not overpower VO
-            filter_complex.append(f"[{audio_count+1}:a]volume=0.15[bgm]")
-            audio_count += 1
+            music_idx = len(inputs) - 1
+            filter_complex.append(f"[{music_idx}:a]volume=0.15[bgm]")
+            audio_sources.append("[bgm]")
 
-        if audio_count == 1:
-            amix = "[vo]" if voiceover_bytes else "[bgm]"
-            map_audio = "[vo]" if voiceover_bytes else "[bgm]"
+        if not audio_sources:
+            return video_bytes
+
+        if len(audio_sources) == 1:
+            map_audio = audio_sources[0]
+            amix_str = ""
         else:
-            amix = "[vo][bgm]amix=inputs=2:duration=first[aout]"
+            inputs_str = "".join(audio_sources)
+            amix_str = f"; {inputs_str}amix=inputs={len(audio_sources)}:duration=first[aout]"
             map_audio = "[aout]"
 
         output_path = os.path.join(tmpdir, "mixed.mp4")
         cmd = [FFMPEG_EXE, "-y"] + inputs + [
-            "-filter_complex", "; ".join(filter_complex) + ("; " + amix if audio_count > 1 else ""),
+            "-filter_complex", "; ".join(filter_complex) + amix_str,
             "-map", "0:v", "-map", map_audio,
             "-c:v", "copy", "-c:a", "aac", "-shortest", output_path
         ]
 
         try:
+            log_message(f"Running ffmpeg mix: {' '.join(cmd)}", Severity.INFO)
             subprocess.run(cmd, check=True, capture_output=True)
             with open(output_path, "rb") as f:
                 return f.read()
         except subprocess.CalledProcessError as e:
             err_msg = e.stderr.decode() if e.stderr else str(e)
-            print(f"FFMPEG ERROR: {err_msg}")
             log_message(f"Audio mixing failed: {err_msg}", Severity.ERROR)
             return video_bytes
         except Exception as e:
-            print(f"Audio mix exception: {e}")
             log_message(f"Audio mixing failed: {e}", Severity.ERROR)
             return video_bytes
 
@@ -290,7 +316,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
                 dur_str = subprocess.check_output(dur_cmd).decode().strip()
                 dur = float(dur_str)
             except Exception as e:
-                logger.error(f"Failed to get audio duration for slide {i}: {e}")
+                log_message(f"Failed to get audio duration for slide {i}: {e}", Severity.WARNING)
                 dur = 5.0
             
             # Use simple loop with exact duration
