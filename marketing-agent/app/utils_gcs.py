@@ -25,12 +25,22 @@ from .adk_common.utils import utils_agents
 
 def get_public_url(blob_path: str) -> str:
     """Returns a CDN URL if CDN_HOST is set. Otherwise, generates a secure Signed URL."""
-    # Clean up blob_path if it's a gs:// URI
+    if not blob_path:
+        return ""
+
+    # Clean up blob_path to extract the raw object path
     if blob_path.startswith("gs://"):
         # Remove gs://bucket-name/
         parts = blob_path.replace("gs://", "").split("/", 1)
-        if len(parts) > 1:
-            blob_path = parts[1]
+        blob_path = parts[1] if len(parts) > 1 else parts[0]
+    elif "storage.cloud.google.com/" in blob_path:
+        # Remove https://storage.cloud.google.com/bucket-name/
+        parts = blob_path.split("storage.cloud.google.com/", 1)[1].split("/", 1)
+        blob_path = parts[1] if len(parts) > 1 else parts[0]
+    elif "storage.googleapis.com/" in blob_path:
+        # Remove https://storage.googleapis.com/bucket-name/
+        parts = blob_path.split("storage.googleapis.com/", 1)[1].split("/", 1)
+        blob_path = parts[1] if len(parts) > 1 else parts[0]
 
     if CDN_HOST:
         return f"https://{CDN_HOST}/{blob_path}"

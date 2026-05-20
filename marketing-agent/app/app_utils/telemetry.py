@@ -28,7 +28,9 @@ def setup_telemetry() -> str | None:
     # 1. OpenTelemetry Tracing Setup (Cloud Trace)
     try:
         # Use a project ID from environment or default
-        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if not project_id:
+            project_id = None
         
         provider = TracerProvider()
         exporter = CloudTraceSpanExporter(project_id=project_id)

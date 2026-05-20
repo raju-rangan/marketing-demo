@@ -393,6 +393,7 @@ def deploy_agent_engine_app(
     env_vars.update(secrets)  # type: ignore
 
     # Set deployment-specific environment variables
+    env_vars["PROJECT_ID"] = project
     env_vars["GOOGLE_CLOUD_REGION"] = location
     env_vars["NUM_WORKERS"] = str(num_workers)
 

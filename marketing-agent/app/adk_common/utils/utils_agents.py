@@ -535,7 +535,7 @@ def get_genai_client(use_global: bool = False):
     global _genai_client, _genai_client_global
     from google import genai
 
-    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 
     if use_global:

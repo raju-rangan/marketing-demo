@@ -53,7 +53,7 @@ from .state import (
     UPLOAD_COUNTER_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
-from shared_infra.utils_media import (
+from .shared_infra.utils_media import (
     stitch_videos,
     mix_audio_onto_video,
     overlay_logo_on_video,
@@ -130,13 +130,21 @@ async def _retry_generate_content(model, contents, config, label="LLM", max_atte
             else:
                 raise
 
-async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image") -> bytes | None:
+async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image", aspect_ratio: str = None) -> bytes | None:
     parts = [types.Part.from_bytes(data=img, mime_type="image/png") for img in reference_images]
     parts.append(types.Part.from_text(text=prompt))
-    
+
     contents = [types.Content(role="user", parts=parts)]
-    config = types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"])
-    
+
+    image_config = None
+    if aspect_ratio:
+        image_config = types.ImageConfig(aspect_ratio=aspect_ratio)
+
+    config = types.GenerateContentConfig(
+        response_modalities=["IMAGE", "TEXT"],
+        image_config=image_config
+    )
+
     for attempt in range(5):
         try:
             response = await asyncio.wait_for(
@@ -476,7 +484,7 @@ async def generate_campaign_storyboard(
             f"{compliance}\n"
             f"16:9 landscape. Return only the image. NO text labels or counters."
         )
-        return await _generate_gemini_image(prompt, current_refs, label=f"storyboard_frame")
+        return await _generate_gemini_image(prompt, current_refs, label=f"storyboard_frame", aspect_ratio="16:9")
 
     log_message(f"Generating {NUM_KEYFRAMES} human-first keyframes for v{current_iter}...", Severity.INFO)
     kf_results = await asyncio.gather(*[_gen_kf(i) for i in range(NUM_KEYFRAMES)])

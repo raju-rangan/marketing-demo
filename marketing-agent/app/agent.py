@@ -21,7 +21,12 @@ dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 load_dotenv(dotenv_path)
 
 # Set critical environment variables for ADK if not already set
-os.environ.setdefault("GOOGLE_CLOUD_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", ""))
+if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
+    # If not in environ, try to get from .env (already loaded by load_dotenv above)
+    project = os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    if project:
+        os.environ["GOOGLE_CLOUD_PROJECT"] = project
+
 os.environ.setdefault("GOOGLE_CLOUD_LOCATION", os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
 os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "True")
 

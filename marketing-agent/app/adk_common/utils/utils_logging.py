@@ -83,7 +83,7 @@ def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
 from google.genai import types
 
 # Set this to a positive value to truncate long strings in logs
-MAX_LOG_STRING_LENGTH = 0
+MAX_LOG_STRING_LENGTH = 500
 
 def sanitize_arg(arg):
     """Sanitizes arguments for logging, redacting bytes and large objects."""

@@ -32,7 +32,9 @@ load_dotenv()
 class AgentEngineApp(AdkApp):
     def set_up(self) -> None:
         """Initialize the agent engine app with logging and telemetry."""
-        vertexai.init()
+        project = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        location = os.environ.get("GOOGLE_CLOUD_LOCATION")
+        vertexai.init(project=project, location=location)
         setup_telemetry()
         super().set_up()
         logging.basicConfig(level=logging.INFO)

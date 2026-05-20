@@ -21,6 +21,10 @@ import shutil
 import logging
 from enum import Enum
 
+import imageio_ffmpeg
+
+import re
+
 class Severity(Enum):
     INFO = logging.INFO
     WARNING = logging.WARNING
@@ -29,39 +33,65 @@ class Severity(Enum):
 def log_message(msg: str, severity: Severity = Severity.INFO):
     logging.log(severity.value, msg)
 
-FFMPEG_EXE = shutil.which("ffmpeg") or "ffmpeg"
-FFPROBE_EXE = shutil.which("ffprobe") or "ffprobe"
+# FFmpeg / FFprobe path discovery using imageio-ffmpeg
+try:
+    FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG_EXE = shutil.which("ffmpeg") or "ffmpeg"
+
+# Attempt to find ffprobe, fallback to ffmpeg if not found
+FFPROBE_EXE = shutil.which("ffprobe")
+if not FFPROBE_EXE:
+    # imageio-ffmpeg usually places ffprobe in the same directory as ffmpeg
+    potential_ffprobe = FFMPEG_EXE.replace("ffmpeg", "ffprobe")
+    if os.path.exists(potential_ffprobe):
+        FFPROBE_EXE = potential_ffprobe
+    else:
+        # We will use FFMPEG_EXE as a fallback for FFPROBE_EXE tasks in our code
+        FFPROBE_EXE = None
 
 def get_video_duration(video_path: str) -> float:
-    """Gets duration of a video file using ffprobe."""
-    if not FFPROBE_EXE:
-        return 0.0
+    """Gets duration of a video or audio file using ffprobe or ffmpeg fallback."""
+    if FFPROBE_EXE:
+        try:
+            cmd = [
+                FFPROBE_EXE, "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", video_path
+            ]
+            output = subprocess.check_output(cmd).decode().strip()
+            return float(output)
+        except Exception as e:
+            log_message(f"ffprobe duration failed: {e}", Severity.DEBUG)
+    
+    # Fallback to ffmpeg
     try:
-        cmd = [
-            FFPROBE_EXE, "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", video_path
-        ]
-        output = subprocess.check_output(cmd).decode().strip()
-        return float(output)
+        cmd = [FFMPEG_EXE, "-i", video_path]
+        output = subprocess.run(cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, text=True).stdout
+        # Look for "Duration: 00:00:05.12"
+        match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", output)
+        if match:
+            h, m, s = match.groups()
+            return int(h) * 3600 + int(m) * 60 + float(s)
     except Exception as e:
-        log_message(f"Error getting video duration: {e}", Severity.WARNING)
-        return 0.0
+        log_message(f"Error getting duration with ffmpeg: {e}", Severity.WARNING)
+    
+    return 0.0
 
 def get_video_dimensions(video_path: str) -> tuple[int, int]:
-    """Gets width and height of a video file using ffprobe."""
-    if not FFPROBE_EXE:
-        return 1280, 720
-    try:
-        cmd = [
-            FFPROBE_EXE, "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=s=x:p=0", video_path
-        ]
-        output = subprocess.check_output(cmd).decode().strip().split('x')
-        return int(output[0]), int(output[1])
-    except Exception as e:
-        log_message(f"Error getting video dimensions: {e}", Severity.WARNING)
-        return 1280, 720
+    """Gets width and height of a video file using ffprobe or default."""
+    if FFPROBE_EXE:
+        try:
+            cmd = [
+                FFPROBE_EXE, "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=s=x:p=0", video_path
+            ]
+            output = subprocess.check_output(cmd).decode().strip().split('x')
+            return int(output[0]), int(output[1])
+        except Exception as e:
+            log_message(f"Error getting video dimensions: {e}", Severity.WARNING)
+    
+    return 1280, 720
 
 def stitch_videos(clip_bytes_list: list[bytes]) -> bytes | None:
     """Stitches multiple MP4 clips into one using ffmpeg's concat demuxer."""
@@ -93,16 +123,24 @@ def stitch_videos(clip_bytes_list: list[bytes]) -> bytes | None:
             return None
 
 def has_audio(video_path: str) -> bool:
-    """Checks if a video file has an audio track."""
-    if not FFPROBE_EXE:
-        return False
+    """Checks if a video or audio file has an audio track using ffprobe or ffmpeg fallback."""
+    if FFPROBE_EXE:
+        try:
+            cmd = [
+                FFPROBE_EXE, "-v", "error", "-select_streams", "a",
+                "-show_entries", "stream=index", "-of", "csv=p=0", video_path
+            ]
+            output = subprocess.check_output(cmd).decode().strip()
+            return len(output) > 0
+        except Exception:
+            pass
+    
+    # Fallback to ffmpeg
     try:
-        cmd = [
-            FFPROBE_EXE, "-v", "error", "-select_streams", "a",
-            "-show_entries", "stream=index", "-of", "csv=p=0", video_path
-        ]
-        output = subprocess.check_output(cmd).decode().strip()
-        return len(output) > 0
+        # Try to map audio stream to null output. If it fails, there's no audio.
+        cmd = [FFMPEG_EXE, "-i", video_path, "-map", "a", "-t", "0.1", "-f", "null", "-"]
+        result = subprocess.run(cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        return result.returncode == 0
     except Exception:
         return False
 
@@ -147,7 +185,7 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             inputs.extend(["-i", music_path])
             # Correctly calculate the input index (0-based)
             music_idx = (len(inputs) // 2) - 1
-            filter_complex.append(f"[{music_idx}:a]volume=0.15[bgm]")
+            filter_complex.append(f"[{music_idx}:a]volume=0.06[bgm]")
             audio_sources.append("[bgm]")
 
         if not audio_sources:
@@ -313,12 +351,9 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
             with open(img_path, "wb") as f: f.write(slide["image_bytes"])
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
             
-            dur_cmd = [FFPROBE_EXE, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", aud_path]
-            try:
-                dur_str = subprocess.check_output(dur_cmd).decode().strip()
-                dur = float(dur_str)
-            except Exception as e:
-                log_message(f"Failed to get audio duration for slide {i}: {e}", Severity.WARNING)
+            dur = get_video_duration(aud_path)
+            if dur <= 0:
+                log_message(f"Failed to get audio duration for slide {i}, defaulting to 5.0s", Severity.WARNING)
                 dur = 5.0
             
             # Use simple loop with exact duration
