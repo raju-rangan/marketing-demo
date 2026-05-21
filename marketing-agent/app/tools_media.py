@@ -51,6 +51,8 @@ from .state import (
     ASSET_REGISTRY_STATE_KEY,
     STORYBOARD_ITERATION_STATE_KEY,
     UPLOAD_COUNTER_STATE_KEY,
+    VOICEOVER_STYLES,
+    CHOSEN_VOICEOVER_STYLE_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
 from .shared_infra.utils_media import (
@@ -275,14 +277,16 @@ async def _generate_lyria_music(lyria_prompt: str, product_name: str) -> bytes |
         log_message(f"Lyria music generation failed: {e}", Severity.ERROR)
         return None
 
-async def _generate_voiceover_audio(script: str) -> bytes | None:
+async def _generate_voiceover_audio(script: str, voice_name: str = None) -> bytes | None:
     """Generates voiceover audio using Cloud TTS Chirp3-HD."""
     from google.cloud import texttospeech
     try:
         if not script or len(script.strip()) < 5:
             return None
 
-        log_message(f"Generating voiceover for script: {script}...", Severity.INFO)
+        # Fallback to the default environment variable if no specific voice provided
+        selected_voice = voice_name or GEMINI_TTS_VOICE
+        log_message(f"Generating voiceover using voice '{selected_voice}' for script: {script[:50]}...", Severity.INFO)
         
         for attempt in range(3):
             try:
@@ -291,7 +295,7 @@ async def _generate_voiceover_audio(script: str) -> bytes | None:
                     input=texttospeech.SynthesisInput(text=script),
                     voice=texttospeech.VoiceSelectionParams(
                         language_code="en-US",
-                        name=f"en-US-Chirp3-HD-{GEMINI_TTS_VOICE}",
+                        name=f"en-US-Chirp3-HD-{selected_voice}",
                     ),
                     audio_config=texttospeech.AudioConfig(
                         audio_encoding=texttospeech.AudioEncoding.MP3,

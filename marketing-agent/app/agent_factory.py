@@ -64,6 +64,7 @@ from .tools_slidecast import (
     generate_slidecast_storyboard,
     preview_slidecast_assets,
     finalize_slidecast_video,
+    select_slidecast_style,
 )
 
 # Import sub-agents

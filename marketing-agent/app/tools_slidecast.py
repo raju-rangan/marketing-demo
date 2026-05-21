@@ -9,12 +9,15 @@ from .adk_common.utils import utils_agents
 from .adk_common.utils.utils_logging import Severity, log_message
 from google import genai
 from google.genai import types
-
 from .state import (
     GOOGLE_CLOUD_PROJECT,
     PRODUCT_COMPANY_NAME_STATE_KEY,
     REFERENCE_GUIDELINES_STATE_KEY,
     LOGO_IMAGE_URI_STATE_KEY,
+    SLIDE_STYLES,
+    VOICEOVER_STYLES,
+    CHOSEN_SLIDE_STYLE_STATE_KEY,
+    CHOSEN_VOICEOVER_STYLE_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
 from .schema import SlidecastStoryboard, SlidecastSlide
@@ -26,9 +29,56 @@ from .tools_media import (
     _get_brand_wall_directive,
 )
 from .shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
+from fpdf import FPDF
+import io
 
 # Initialize GenAI Client
 client = genai.Client(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location="global")
+
+def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_images: List[bytes]) -> bytes:
+    """Generates a professional PDF for asset approval."""
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Add Title Page
+    pdf.add_page()
+    pdf.set_font("helvetica", "B", 24)
+    pdf.set_text_color(0, 74, 153) # Chase Blue
+    pdf.cell(0, 40, "Slidecast Approval Document", ln=True, align="C")
+    pdf.set_font("helvetica", "B", 18)
+    pdf.cell(0, 20, title, ln=True, align="C")
+    pdf.ln(20)
+    
+    pdf.set_font("helvetica", "", 12)
+    pdf.set_text_color(51, 51, 51)
+    pdf.multi_cell(0, 10, "Please review the visual assets and narration tracks for each slide below. This document serves as the formal storyboard for your educational video.")
+    pdf.ln(10)
+
+    # Add Slides
+    for i, (slide, img_bytes) in enumerate(zip(slides, slide_images)):
+        if i % 2 == 0 and i > 0:
+            pdf.add_page()
+        
+        pdf.set_font("helvetica", "B", 14)
+        pdf.set_text_color(0, 74, 153)
+        pdf.cell(0, 10, f"Slide {i+1}", ln=True)
+        pdf.ln(5)
+        
+        # Add Image
+        with io.BytesIO(img_bytes) as img_io:
+            # We use a temporary filename or just pass the stream if supported by fpdf2
+            pdf.image(img_io, x=15, w=100)
+        
+        pdf.ln(5)
+        pdf.set_font("helvetica", "B", 12)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 10, "Talk Track:", ln=True)
+        pdf.set_font("helvetica", "", 11)
+        pdf.set_text_color(68, 68, 68)
+        pdf.multi_cell(0, 6, slide.script)
+        pdf.ln(15)
+
+    return pdf.output()
 
 def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
     """Researches a list of URLs using Gemini Search Grounding and creates a consolidated insight report."""
@@ -66,10 +116,13 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
-    # Calculate total word target
+    # Style & Word Count
     total_word_target = duration_minutes * 160
     num_slides = max(12, min(20, duration_minutes * 3))
     words_per_slide = total_word_target // num_slides
+    
+    selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Clean Corporate")
+    style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Clean Corporate"])
 
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
@@ -86,7 +139,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data.\n"
         f"2. NARRATION: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words). Do NOT be concise.\n"
         f"3. BRANDING: Use {company_name}'s color palette (e.g., Chase Blue/White) for all designs.\n"
-        f"4. VISUAL STYLE: Every slide MUST follow a 'PREMIUM STUDIO' aesthetic: clean white/grey backgrounds, precise studio lighting, and minimal composition. NO style variations across slides.\n\n"
+        f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
@@ -148,6 +201,10 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
     except Exception as e:
         return {"status": "error", "details": f"Invalid storyboard format: {e}"}
 
+    # Style selection
+    selected_voice_name = tool_context.state.get(CHOSEN_VOICEOVER_STYLE_STATE_KEY, "Energetic & Engaging")
+    voice_id = VOICEOVER_STYLES.get(selected_voice_name, VOICEOVER_STYLES["Energetic & Engaging"])
+
     # Process slides in parallel
     async def process_slide(slide: SlidecastSlide, idx: int):
         log_message(f"Rendering preview for slide {idx+1}...", Severity.INFO)
@@ -159,26 +216,30 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         # Save image as artifact
         img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
         saved_img = await utils_agents.save_to_artifact_and_render_asset(
-            asset=img_media, context=tool_context, save_in_gcs=True, gcs_folder=current_output_folder
+            asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
         )
         slide.image_url = get_public_url(saved_img.gcs_uri)
 
         # 2. Generate Voiceover
-        vo_bytes = await _generate_voiceover_audio(slide.script)
+        vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
         if not vo_bytes:
             raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
 
         # Save audio as artifact
         aud_media = GeneratedMedia(filename=f"audio_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
         saved_aud = await utils_agents.save_to_artifact_and_render_asset(
-            asset=aud_media, context=tool_context, save_in_gcs=True, gcs_folder=current_output_folder
+            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
         )
         slide.audio_url = get_public_url(saved_aud.gcs_uri)
 
-        return slide
+        return slide, img_bytes
+
     try:
         slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
-        sb.slides = await asyncio.gather(*slide_tasks)
+        results = await asyncio.gather(*slide_tasks)
+        
+        sb.slides = [r[0] for r in results]
+        slide_images = [r[1] for r in results]
 
         # 3. Generate HTML Approval Page
         html_content = f"""
@@ -235,14 +296,23 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         # Save HTML as artifact
         html_media = GeneratedMedia(filename="approval_page.html", mime_type="text/html", media_bytes=html_content.encode("utf-8"))
         saved_html = await utils_agents.save_to_artifact_and_render_asset(
-            asset=html_media, context=tool_context, save_in_gcs=True, gcs_folder=current_output_folder
+            asset=html_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
         )
         approval_url = get_public_url(saved_html.gcs_uri)
 
+        # 4. Generate PDF Approval Page
+        pdf_bytes = _generate_approval_pdf(sb.title, sb.slides, slide_images)
+        pdf_media = GeneratedMedia(filename="approval_document.pdf", mime_type="application/pdf", media_bytes=pdf_bytes)
+        saved_pdf = await utils_agents.save_to_artifact_and_render_asset(
+            asset=pdf_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+        )
+        pdf_url = get_public_url(saved_pdf.gcs_uri)
+
         return {
             "status": "success",
-            "message": "Assets and Approval Page generated. Please review the approval page link below before proceeding.",
+            "message": "Assets generated. Please review the HTML approval page or download the PDF document below.",
             "approval_page_url": approval_url,
+            "approval_pdf_url": pdf_url,
             "storyboard": sb.model_dump()
         }
     except Exception as e:
@@ -315,4 +385,27 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     )
     url = get_public_url(saved_video.gcs_uri)
     return {"status": "success", "video_url": url, "details": "Slidecast masterclass finalized and ready for viewing."}
+
+def select_slidecast_style(tool_context: ToolContext, slide_style: str = "Clean Corporate", voiceover_style: str = "Energetic & Engaging") -> dict:
+    """Sets the visual and vocal style for the upcoming Slidecast.
+    
+    Args:
+        slide_style: The visual aesthetic (e.g., 'Clean Corporate', 'Modern Minimalist', 'Financial Executive', 'Tech Forward').
+        voiceover_style: The persona of the narrator (e.g., 'Energetic & Engaging', 'Professional & Trustworthy', 'Calm & Sophisticated', 'Authoritative & Wise').
+    """
+    if slide_style not in SLIDE_STYLES:
+        return {"status": "error", "message": f"Invalid slide style. Choose from: {list(SLIDE_STYLES.keys())}"}
+    if voiceover_style not in VOICEOVER_STYLES:
+        return {"status": "error", "message": f"Invalid voiceover style. Choose from: {list(VOICEOVER_STYLES.keys())}"}
+
+    tool_context.state[CHOSEN_SLIDE_STYLE_STATE_KEY] = slide_style
+    tool_context.state[CHOSEN_VOICEOVER_STYLE_STATE_KEY] = voiceover_style
+    
+    log_message(f"Slidecast style locked: {slide_style} / {voiceover_style}", Severity.INFO)
+    return {
+        "status": "success", 
+        "message": f"Style confirmed. I will now use the '{slide_style}' visual aesthetic and the '{voiceover_style}' voice for your Slidecast.",
+        "slide_style": slide_style,
+        "voiceover_style": voiceover_style
+    }
 

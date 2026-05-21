@@ -69,7 +69,7 @@ OUTPUT_FOLDER = "generated"
 # ============================================================
 CHOSEN_CAMPAIGN_IDEA_STATE_KEY = "CHOSEN_CAMPAIGN_IDEA"
 CHOSEN_ASSET_SHEET_ID_STATE_KEY = "CHOSEN_ASSET_SHEET_ID"
-PRODUCT_COMPANY_NAME_STATE_KEY = "PRODUCT_COMPANY_NAME"
+PRODUCT_COMPANY_NAME_STATE_KEY = get_optional_env_var("PRODUCT_COMPANY_NAME_STATE_KEY", "PRODUCT_COMPANY_NAME")
 PRODUCT_IMAGE_URI_STATE_KEY = "PRODUCT_IMAGE_URI"
 LOGO_IMAGE_URI_STATE_KEY = "LOGO_IMAGE_URI"
 PRODUCT_SETUP_DONE_STATE_KEY = "PRODUCT_SETUP_DONE"
@@ -83,6 +83,27 @@ CUSTOMER_PERSONA_STATE_KEY = "CUSTOMER_PERSONA"
 ASSET_REGISTRY_STATE_KEY = "ASSET_REGISTRY"
 STORYBOARD_ITERATION_STATE_KEY = "STORYBOARD_ITERATION"
 UPLOAD_COUNTER_STATE_KEY = "UPLOAD_COUNTER"
+
+# ============================================================
+# Stylistic Choices
+# ============================================================
+
+SLIDE_STYLES = {
+    "Clean Corporate": "Professional white/light grey backgrounds with Chase Blue accents. Minimalist vector-style diagrams and high-key, even studio lighting. Sharp typography and clean grids.",
+    "Modern Minimalist": "Soft pastel tones, airy and spacious compositions. Focus on negative space and elegant, lightweight sans-serif typography. Natural, bright daylight feel.",
+    "Financial Executive": "Dark navy or charcoal backgrounds with sophisticated gold and white accents. Deep, moody lighting with subtle gradients. Highly detailed data visualizations and glass-morphism elements.",
+    "Tech Forward": "Sleek, dark aesthetic with holographic UI elements and subtle blue glowing accents. Focus on precision engineering and digital connectivity. Sharp, high-contrast lighting.",
+}
+
+VOICEOVER_STYLES = {
+    "Energetic & Engaging": "Algieba", # Male, friendly, upbeat
+    "Professional & Trustworthy": "Aoede", # Female, clear, professional
+    "Calm & Sophisticated": "Hestia", # Female, smooth, premium
+    "Authoritative & Wise": "Charon", # Male, deep, resonant
+}
+
+CHOSEN_SLIDE_STYLE_STATE_KEY = "CHOSEN_SLIDE_STYLE"
+CHOSEN_VOICEOVER_STYLE_STATE_KEY = "CHOSEN_VOICEOVER_STYLE"
 
 CUSTOMER_PERSONAS = {
     1: {

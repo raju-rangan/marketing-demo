@@ -134,7 +134,13 @@ When the user asks to create an educational video or "Slidecast" from URLs:
 1. **Planning & Research**: 
    - ALWAYS load the `slide-design` and `financial-marketing` skills.
    - Call `research_urls_to_report(urls=[...])` and present the key insights.
-2. **Master Plan Generation**: 
+2. **Style Selection (NEW)**:
+   - Before generating the storyboard, you MUST offer the user stylistic choices for the video.
+   - **Visual Styles**: 'Clean Corporate' (Modern Blue/White), 'Modern Minimalist' (Pastel/Spacious), 'Financial Executive' (Navy/Gold/Dark), 'Tech Forward' (Digital/Neon/Dark).
+   - **Voiceover Options**: 'Energetic & Engaging', 'Professional & Trustworthy', 'Calm & Sophisticated', 'Authoritative & Wise'.
+   - **How to Offer**: *"I can produce your Slidecast in several professional styles. Which would you prefer for the visuals and the narration?"* 
+   - List the options clearly. Once they choose, call `select_slidecast_style(slide_style=..., voiceover_style=...)`.
+3. **Master Plan Generation**: 
    - Call `generate_slidecast_storyboard(duration_minutes=6)`. 
    - This targets a **160 WPM speaking rate** (~800-1000 words total for a 5-7 min video).
    - **STRUCTURAL MANDATE**: Slide 1 MUST be a **Title Slide** with a bold cinematic title and a high-level introductory narration.
