@@ -543,8 +543,6 @@ async def _create_display_ad_task(
 
     reference_parts = []
     reference_parts.append(types.Part.from_bytes(data=product_bytes, mime_type="image/png"))
-    if logo_bytes:
-        reference_parts.append(types.Part.from_bytes(data=logo_bytes, mime_type="image/png"))
     if asset_sheet_bytes:
         reference_parts.append(types.Part.from_bytes(data=asset_sheet_bytes, mime_type="image/png"))
 
@@ -559,23 +557,22 @@ async def _create_display_ad_task(
         f"**AESTHETIC**: Ultra-premium luxury commercial photography. Masters of color and light.\n\n"
         f"**RULES**:\n"
         f"1. Reproduce product with pixel-perfect fidelity.\n"
-        f"2. Place logo prominently in a standard position.\n"
-        f"{'3. Use characters/aesthetic from the ASSET SHEET (3rd image).' if asset_sheet_bytes else ''}\n"
-        f"4. Product at CORRECT real-world scale. Physics must be real.\n"
-        f"5. EXPANSIVE COMPOSITION. Show context. NO close-up faces.\n"
-        f"6. Do not force the product image into the scene. Make it natural.\n"
-        f"7. The output should feel like a premium,luxury commercial.\n"
-        f"8. Focus on the activity and the emotion. Product should be secondary.\n"
-        f"9. Show people enjoying the moment or activity that the product facilitates.\n"
-        f"10. There should be an element of sophistication and elegance in the composition.\n"
-        f"11. Use natural lighting and shadows to create a realistic and premium feel.\n"
-        f"12. The composition should be visually balanced and appealing to the eye.\n"
-        f"13. The colors should be vibrant but natural, reflecting the premium nature of the product.\n"
-        f"14. The output should be a high-quality, professional advertisement.\n"
-        f"15. The output should be suitable for use in a marketing campaign.\n"
+        f"{'2. Use characters/aesthetic from the ASSET SHEET (2nd image).' if asset_sheet_bytes else ''}\n"
+        f"3. Product at CORRECT real-world scale. Physics must be real.\n"
+        f"4. EXPANSIVE COMPOSITION. Show context. NO close-up faces.\n"
+        f"5. Do not force the product image into the scene. Make it natural.\n"
+        f"6. The output should feel like a premium,luxury commercial.\n"
+        f"7. Focus on the activity and the emotion. Product should be secondary.\n"
+        f"8. Show people enjoying the moment or activity that the product facilitates.\n"
+        f"9. There should be an element of sophistication and elegance in the composition.\n"
+        f"10. Use natural lighting and shadows to create a realistic and premium feel.\n"
+        f"11. The composition should be visually balanced and appealing to the eye.\n"
+        f"12. The colors should be vibrant but natural, reflecting the premium nature of the product.\n"
+        f"13. The output should be a high-quality, professional advertisement.\n"
+        f"14. The output should be suitable for use in a marketing campaign.\n"
         f"{brand_wall}\n"
         f"{'**TARGET AUDIENCE**: ' + persona if persona else ''}\n"
-        f"**FINAL OUTPUT**: Return ONLY the ad image. NO text labels or counters."
+        f"**FINAL OUTPUT**: Return ONLY the ad image. NO text labels, counters, or logos."
     )
 
     return await generate_and_select_best_image(

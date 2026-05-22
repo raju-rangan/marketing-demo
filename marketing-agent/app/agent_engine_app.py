@@ -32,13 +32,14 @@ load_dotenv()
 class AgentEngineApp(AdkApp):
     def set_up(self) -> None:
         """Initialize the agent engine app with logging and telemetry."""
-        # Use PROJECT_ID (string ID) to avoid conversion errors from numeric GOOGLE_CLOUD_PROJECT
+        # Use PROJECT_ID (string ID from .env) if available to avoid numeric resolution errors.
+        # Fallback to system GOOGLE_CLOUD_PROJECT if not explicitly set.
         project = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
         
         # Standardize on 'global' location to support latest preview models and bypass regional discovery
         location = "global"
         
-        logging.info(f"Initializing Vertex AI (Global) with project={project}")
+        logging.info(f"Initializing Vertex AI (Global) with resolved project={project}")
         
         try:
             vertexai.init(project=project, location=location)

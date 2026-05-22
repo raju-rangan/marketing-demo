@@ -106,11 +106,11 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         log_message(f"Research failed: {e}", Severity.ERROR)
         return f"Error during research: {e}"
 
-def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5) -> dict:
+def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5, language: str = "English") -> dict:
     """Generates a long-form SlidecastStoryboard (JSON) from a research report.
     Enforces a Title Slide for Slide 1 and targets 160 WPM.
     """
-    log_message(f"Generating branded storyboard for {duration_minutes} min video...", Severity.INFO)
+    log_message(f"Generating branded storyboard for {duration_minutes} min video in {language}...", Severity.INFO)
 
     company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
@@ -126,9 +126,13 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
 
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
-        f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast'.\n\n"
+        f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast' in {language}.\n\n"
+        f"LANGUAGE REQUIREMENT:\n"
+        f"- ALL NARRATION SCRIPTS MUST BE WRITTEN IN {language}.\n"
+        f"- ALL VISUAL TEXT (titles, labels, infographic text) DESCRIBED IN IMAGE PROMPTS MUST BE WRITTEN IN {language}.\n"
+        f"- Use formal, professional {language} appropriate for an executive educational video.\n\n"
         f"STRUCTURE REQUIREMENTS:\n"
-        f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic and a welcoming, high-level introduction narration.\n"
+        f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic in {language} and a welcoming, high-level introduction narration in {language}.\n"
         f"- TOTAL SLIDES: {num_slides} slides total.\n"
         f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt.\n\n"
         f"DURATION & WORD COUNT TARGETS:\n"
@@ -136,23 +140,26 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"- Total Word Count: ~{total_word_target} words (speaking rate: 160 WPM).\n"
         f"- Target per slide: ~{words_per_slide} words of detailed narration.\n\n"
         f"CORE DIRECTIVES:\n"
-        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data.\n"
-        f"2. NARRATION: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words). Do NOT be concise.\n"
+        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
+        f"2. NARRATION: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. Do NOT be concise.\n"
         f"3. BRANDING: Use {company_name}'s color palette (e.g., Chase Blue/White) for all designs.\n"
         f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
-        f"  \"title\": \"Comprehensive Title\",\n"
+        f"  \"title\": \"Comprehensive Title in {language}\",\n"
+        f"  \"summary_arc\": [\"[High-level phase 1]\", \"[High-level phase 2]\", ...],\n"
         f"  \"slides\": [\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography. Include logo in bottom right.]\",\n"
-        f"      \"script\": \"[Introductory narration of approx {words_per_slide} words...]\",\n"
+        f"      \"slide_title\": \"[Concise Slide Title]\",\n"
+        f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography in {language}. Include logo in bottom right. ALL text on the slide MUST be in {language}.]\",\n"
+        f"      \"script\": \"[Introductory narration in {language} of approx {words_per_slide} words...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }},\n"
         f"    {{\n"
-        f"      \"image_prompt\": \"[Infographic layout...]\",\n"
-        f"      \"script\": \"[Detailed educational narration...]\",\n"
+        f"      \"slide_title\": \"[Concise Slide Title]\",\n"
+        f"      \"image_prompt\": \"[Infographic layout with data and labels in {language}. Include logo in bottom right...]\",\n"
+        f"      \"script\": \"[Detailed educational narration in {language}...]\",\n"
         f"      \"text_overlay\": \"\" \n"
         f"    }}\n"
         f"  ],\n"
@@ -177,24 +184,9 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         return {"error": str(e)}
 
 async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates actual images (with logo rendered by the model) and voiceover audio for review."""
+    """Generates actual images and voiceover audio for review."""
     current_output_folder = set_output_folder(tool_context)
-    log_message("Generating asset previews (including native logo rendering)...", Severity.INFO)
-
-    logo_bytes = []
-    logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
-    
-    # Fallback to the provided Chase logo URL if no logo is in state
-    if not logo_uri:
-        logo_uri = "gs://cs-poc-edgd4dliruu2xvksuvo4r3g-artifacts/samples/chase_logo.png"
-    
-    if logo_uri:
-        try:
-            res = await utils_agents.load_resource(logo_uri, tool_context)
-            if res and res.media_bytes:
-                logo_bytes = [res.media_bytes]
-        except Exception as e:
-            log_message(f"Warning: Could not load logo as reference image: {e}", Severity.WARNING)
+    log_message("Generating asset previews...", Severity.INFO)
 
     try:
         sb = SlidecastStoryboard.model_validate(storyboard)
@@ -208,8 +200,8 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
     # Process slides in parallel
     async def process_slide(slide: SlidecastSlide, idx: int):
         log_message(f"Rendering preview for slide {idx+1}...", Severity.INFO)
-        # 1. Generate Image (passing logo as reference)
-        img_bytes = await _generate_gemini_image(slide.image_prompt, logo_bytes, label=f"slide_{idx+1}_image", aspect_ratio="16:9")
+        # 1. Generate Image (logo-free)
+        img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image", aspect_ratio="16:9")
         if not img_bytes:
             raise ValueError(f"Failed to generate image for slide {idx+1}")
 
@@ -357,7 +349,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     
     # Fallback to the provided Chase logo URL
     if not logo_uri:
-        logo_uri = "gs://cs-poc-edgd4dliruu2xvksuvo4r3g-artifacts/samples/chase_logo.png"
+        logo_uri = f"gs://{GOOGLE_CLOUD_BUCKET_ARTIFACTS}/samples/chase_logo.png"
 
     if logo_uri:
         try:

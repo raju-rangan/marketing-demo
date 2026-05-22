@@ -28,6 +28,7 @@ from .adk_common.utils.utils_logging import Severity, log_message
 from .adk_common.utils import utils_agents
 
 def get_public_url(blob_path: str) -> str:
+    return blob_path
     """Returns a CDN URL if CDN_HOST is set. Otherwise, generates a secure Signed URL using IAM."""
     if not blob_path:
         return ""

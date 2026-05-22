@@ -243,6 +243,42 @@ def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float 
         except Exception:
             return video_bytes
 
+def overlay_logo_on_image(image_bytes: bytes, logo_bytes: bytes, position: str = "bottom-right", padding: int = 40) -> bytes:
+    """Programmatically overlays a logo onto an image to ensure 100% brand consistency.
+    Uses PIL to paste the logo at an exact position.
+    """
+    from PIL import Image
+    import io
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as base_img:
+            with Image.open(io.BytesIO(logo_bytes)) as logo_img:
+                # 1. Scale logo to a standard professional size (e.g., 180px wide)
+                target_width = 180
+                w_percent = (target_width / float(logo_img.size[0]))
+                h_size = int((float(logo_img.size[1]) * float(w_percent)))
+                logo_img = logo_img.resize((target_width, h_size), Image.Resampling.LANCZOS)
+
+                # 2. Ensure both are RGBA
+                if base_img.mode != 'RGBA':
+                    base_img = base_img.convert('RGBA')
+                if logo_img.mode != 'RGBA':
+                    logo_img = logo_img.convert('RGBA')
+
+                # 3. Calculate position (Bottom Right)
+                x = base_img.width - logo_img.width - padding
+                y = base_img.height - logo_img.height - padding
+
+                # 4. Paste logo (using the logo itself as a mask for transparency)
+                base_img.paste(logo_img, (x, y), logo_img)
+
+                # 5. Export back to PNG bytes
+                output = io.BytesIO()
+                base_img.save(output, format='PNG')
+                return output.getvalue()
+    except Exception as e:
+        log_message(f"Programmatic logo overlay failed: {e}", Severity.WARNING)
+        return image_bytes
+
 def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video_duration: float,
                       product_name: str = "", price: str = "", acts: Optional[list[dict]] = None, clip_sec: int = 8) -> bytes:
     """Adds cinematic text overlays at specific timestamps, including voiceover captions."""
