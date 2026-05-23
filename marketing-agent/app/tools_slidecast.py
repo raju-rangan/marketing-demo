@@ -11,6 +11,7 @@ from google import genai
 from google.genai import types
 from .state import (
     GOOGLE_CLOUD_PROJECT,
+    GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     PRODUCT_COMPANY_NAME_STATE_KEY,
     REFERENCE_GUIDELINES_STATE_KEY,
     LOGO_IMAGE_URI_STATE_KEY,
@@ -20,7 +21,7 @@ from .state import (
     CHOSEN_VOICEOVER_STYLE_STATE_KEY,
 )
 from .utils_gcs import get_public_url, set_output_folder
-from .schema import SlidecastStoryboard, SlidecastSlide
+from .schema import SlidecastStoryboard, SlidecastSlide, NanomationPlan, NanomationPhase
 
 from .tools_media import (
     _generate_gemini_image,
@@ -121,8 +122,8 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     num_slides = max(12, min(20, duration_minutes * 3))
     words_per_slide = total_word_target // num_slides
     
-    selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Clean Corporate")
-    style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Clean Corporate"])
+    selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Flat Vector Explainer")
+    style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Flat Vector Explainer"])
 
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
@@ -208,7 +209,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         # Save image as artifact
         img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
         saved_img = await utils_agents.save_to_artifact_and_render_asset(
-            asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+            asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
         slide.image_url = get_public_url(saved_img.gcs_uri)
 
@@ -220,7 +221,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         # Save audio as artifact
         aud_media = GeneratedMedia(filename=f"audio_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
         saved_aud = await utils_agents.save_to_artifact_and_render_asset(
-            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
         slide.audio_url = get_public_url(saved_aud.gcs_uri)
 
@@ -285,18 +286,18 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         </html>
         """
 
-        # Save HTML as artifact
+        # Save HTML as artifact (GCS ONLY - Avoid large byte attachments in response)
         html_media = GeneratedMedia(filename="approval_page.html", mime_type="text/html", media_bytes=html_content.encode("utf-8"))
         saved_html = await utils_agents.save_to_artifact_and_render_asset(
-            asset=html_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+            asset=html_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
         approval_url = get_public_url(saved_html.gcs_uri)
 
-        # 4. Generate PDF Approval Page
+        # 4. Generate PDF Approval Page (GCS ONLY - Avoid large byte attachments in response)
         pdf_bytes = _generate_approval_pdf(sb.title, sb.slides, slide_images)
         pdf_media = GeneratedMedia(filename="approval_document.pdf", mime_type="application/pdf", media_bytes=pdf_bytes)
         saved_pdf = await utils_agents.save_to_artifact_and_render_asset(
-            asset=pdf_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+            asset=pdf_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
         pdf_url = get_public_url(saved_pdf.gcs_uri)
 
@@ -373,7 +374,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=video_bytes)
 
     saved_video = await utils_agents.save_to_artifact_and_render_asset(
-        asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+        asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
     )
     url = get_public_url(saved_video.gcs_uri)
     return {"status": "success", "video_url": url, "details": "Slidecast masterclass finalized and ready for viewing."}
@@ -399,5 +400,97 @@ def select_slidecast_style(tool_context: ToolContext, slide_style: str = "Clean 
         "message": f"Style confirmed. I will now use the '{slide_style}' visual aesthetic and the '{voiceover_style}' voice for your Slidecast.",
         "slide_style": slide_style,
         "voiceover_style": voiceover_style
+    }
+
+def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, duration_seconds: int = 5) -> dict:
+    """Generates a NanomationPlan (JSON) for a specific slide topic to create a 5-step progressive animation.
+    Based on the 'Nano Banana' (Imagen 3) concept of precise, consistent sequential image generation.
+    """
+    log_message(f"Planning nanomation for: {slide_topic}...", Severity.INFO)
+    
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
+    
+    prompt = (
+        f"You are a Senior Motion Designer for {company_name}.\n"
+        f"Goal: Plan a 5-frame 'Nanomation' (consistent progressive animation) for the topic: '{slide_topic}'.\n\n"
+        f"CONCEPT (Nano Banana):\n"
+        f"- We will generate a sequence of 5 images showing a clear progression.\n"
+        f"- Each frame must build on the previous one with localized, precise changes.\n"
+        f"- Target high consistency: The background and core subjects must remain stable while specific actions progress.\n\n"
+        f"Output ONLY valid JSON matching this schema:\n"
+        f"{{\n"
+        f"  \"target\": \"[High-level description of the entire animated sequence]\",\n"
+        f"  \"progression_type\": \"linear\",\n"
+        f"  \"phases\": [\n"
+        f"    {{\"description\": \"[Description of frame 1]\", \"image_prompt\": \"[Detailed prompt for Imagen 3]\"}},\n"
+        f"    {{\"description\": \"[Description of frame 2]\", \"image_prompt\": \"[Localized change from frame 1]\"}},\n"
+        f"    ...\n"
+        f"  ],\n"
+        f"  \"topic\": \"{slide_topic}\"\n"
+        f"}}"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.1-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                response_mime_type="application/json",
+            ),
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        log_message(f"Nanomation planning failed: {e}", Severity.ERROR)
+        return {"error": str(e)}
+
+async def execute_slide_animation(tool_context: ToolContext, animation_plan: dict) -> dict:
+    """Executes a NanomationPlan by generating 5 consistent frames using a sequential feedback loop.
+    Each frame uses the previous frame as a reference to ensure 'surgical precision' consistency (Nano Banana).
+    """
+    current_output_folder = set_output_folder(tool_context)
+    log_message("Executing nanomation sequence...", Severity.INFO)
+
+    try:
+        plan = NanomationPlan.model_validate(animation_plan)
+    except Exception as e:
+        return {"status": "error", "details": f"Invalid plan: {e}"}
+
+    frames_bytes = []
+    image_urls = []
+    
+    # Sequential Generation for Consistency (Nano Banana style)
+    # Each frame (after the first) uses the previous frame as a reference.
+    for i, phase in enumerate(plan.phases):
+        log_message(f"Generating frame {i+1}/5: {phase.description}", Severity.INFO)
+        
+        # Use previous frame as reference for surgical consistency
+        refs = [frames_bytes[-1]] if frames_bytes else []
+        
+        # Call the existing image generation tool
+        img_bytes = await _generate_gemini_image(phase.image_prompt, refs, label=f"nanomation_f{i+1}", aspect_ratio="16:9")
+        
+        if not img_bytes:
+            log_message(f"Failed to generate frame {i+1}", Severity.ERROR)
+            break
+        
+        frames_bytes.append(img_bytes)
+        
+        # Save frame to registry/artifacts
+        media = GeneratedMedia(filename=f"nanomation_{int(time.time())}_{i+1}.png", mime_type="image/png", media_bytes=img_bytes)
+        saved = await utils_agents.save_to_artifact_and_render_asset(
+            asset=media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+        )
+        phase.image_url = get_public_url(saved.gcs_uri)
+        image_urls.append(phase.image_url)
+
+    if not image_urls:
+        return {"status": "error", "details": "No frames generated successfully."}
+
+    return {
+        "status": "success",
+        "message": f"Nanomation sequence '{plan.topic}' generated successfully. Review the {len(image_urls)} frames below.",
+        "plan": plan.model_dump(),
+        "image_urls": image_urls
     }
 

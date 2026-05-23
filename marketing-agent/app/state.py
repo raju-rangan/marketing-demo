@@ -89,17 +89,17 @@ UPLOAD_COUNTER_STATE_KEY = "UPLOAD_COUNTER"
 # ============================================================
 
 SLIDE_STYLES = {
-    "Clean Corporate": "Professional white/light grey backgrounds with Chase Blue accents. Minimalist vector-style diagrams and high-key, even studio lighting. Sharp typography and clean grids.",
-    "Modern Minimalist": "Soft pastel tones, airy and spacious compositions. Focus on negative space and elegant, lightweight sans-serif typography. Natural, bright daylight feel.",
-    "Financial Executive": "Dark navy or charcoal backgrounds with sophisticated gold and white accents. Deep, moody lighting with subtle gradients. Highly detailed data visualizations and glass-morphism elements.",
-    "Tech Forward": "Sleek, dark aesthetic with holographic UI elements and subtle blue glowing accents. Focus on precision engineering and digital connectivity. Sharp, high-contrast lighting.",
+    "Flat Vector Explainer": "Clean, flat 2D vector illustration style. High-contrast, minimalist design with a bright, approachable color palette. Solid backgrounds with ample negative space for text and diagrams. No gradients or 3D shading; focus on clear visual communication and infographic-style simplicity.",
+    "Modern 3D Isometric": "Clean 3D isometric rendering, soft claymorphism style. Matte pastel textures, smooth rounded edges, and soft, diffused studio lighting. Clean solid-color background. Visually pleasing, friendly, and highly legible. Emphasize playful, modern educational UI/UX design.",
+    "Documentary Realism": "High-quality documentary-style photography. Bright, even, and natural lighting. Authentic, real-world environments like modern classrooms, bright living rooms, or collaborative workspaces. Shallow depth of field to keep the subject in focus while blurring the background. Clean, professional, and highly trustworthy.",
+    "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts.",
 }
 
 VOICEOVER_STYLES = {
-    "Energetic & Engaging": "Algieba", # Male, friendly, upbeat
-    "Professional & Trustworthy": "Aoede", # Female, clear, professional
-    "Calm & Sophisticated": "Hestia", # Female, smooth, premium
-    "Authoritative & Wise": "Charon", # Male, deep, resonant
+    "Energetic & Engaging": "D", # Male (Energetic)
+    "Professional & Trustworthy": "F", # Female (Professional)
+    "Calm & Sophisticated": "F", # Female (Soft)
+    "Authoritative & Wise": "O", # Male (Authoritative)
 }
 
 CHOSEN_SLIDE_STYLE_STATE_KEY = "CHOSEN_SLIDE_STYLE"

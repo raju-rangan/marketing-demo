@@ -247,4 +247,15 @@ class SlidecastStoryboard(BaseModel):
     music_prompt: Optional[str] = "Cinematic and educational background music"
     video_url: Optional[str] = None
 
+class NanomationPhase(BaseModel):
+    description: str
+    image_prompt: str
+    image_url: Optional[str] = None
+
+class NanomationPlan(BaseModel):
+    target: str
+    progression_type: str = "linear"
+    phases: List[NanomationPhase]
+    topic: str
+
 

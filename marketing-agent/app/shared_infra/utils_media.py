@@ -122,6 +122,34 @@ def stitch_videos(clip_bytes_list: list[bytes]) -> bytes | None:
             log_message(f"ffmpeg stitching failed: {e.stderr.decode()}", Severity.ERROR)
             return None
 
+def stitch_images(image_bytes_list: list[bytes]) -> bytes | None:
+    """Stitches multiple images into one horizontally using ffmpeg hstack."""
+    if not image_bytes_list:
+        return None
+    if len(image_bytes_list) == 1:
+        return image_bytes_list[0]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        inputs = []
+        for i, img_bytes in enumerate(image_bytes_list):
+            img_path = os.path.join(tmpdir, f"img_{i}.png")
+            with open(img_path, "wb") as f:
+                f.write(img_bytes)
+            inputs.extend(["-i", img_path])
+
+        output_path = os.path.join(tmpdir, "stitched.png")
+        # Use hstack filter to combine images side-by-side
+        filter_str = f"hstack=inputs={len(image_bytes_list)}"
+        cmd = [FFMPEG_EXE, "-y"] + inputs + ["-filter_complex", filter_str, output_path]
+        
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            with open(output_path, "rb") as f:
+                return f.read()
+        except subprocess.CalledProcessError as e:
+            log_message(f"ffmpeg image stitching failed: {e.stderr.decode()}", Severity.ERROR)
+            return None
+
 def has_audio(video_path: str) -> bool:
     """Checks if a video or audio file has an audio track using ffprobe or ffmpeg fallback."""
     if FFPROBE_EXE:

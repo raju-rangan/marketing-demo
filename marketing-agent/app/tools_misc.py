@@ -165,3 +165,58 @@ def rename_asset_tag(tool_context: ToolContext, old_tag: str, new_tag: str):
 async def deploy_react_website(tool_context: ToolContext, brand_name: str, html_code: str) -> dict:
     """Simulates deploying a React-based landing page for the campaign."""
     return {"status": "success", "url": "https://chase-demo-landing-page.web.app", "details": "Website deployed successfully!"}
+
+async def run_production_test(tool_context: ToolContext, url: str = "https://www.chase.com/personal/investments/curriculum/save-and-invest") -> dict:
+    """EASTER EGG: A special shortcut to test the full production pipeline (Research -> Storyboard -> Audio -> Video -> Stitching).
+    
+    Args:
+        url: The URL to research and use as a basis for image generation.
+    """
+    from .tools_slidecast import (
+        research_urls_to_report, 
+        generate_slidecast_storyboard, 
+        preview_slidecast_assets, 
+        finalize_slidecast_video, 
+        select_slidecast_style
+    )
+    from .tools_media import create_image_composite
+    
+    log_message(f"Running full production test for {url}...", Severity.INFO)
+    
+    # 1. Setup Brand & Style (Ensures we follow the style guide)
+    select_brand_preset(tool_context, "Chase Sapphire Reserve")
+    # Using 'Modern 3D Isometric' and 'Professional & Trustworthy' (Kalliope)
+    select_slidecast_style(tool_context, "Modern 3D Isometric", "Professional & Trustworthy")
+    
+    # 2. Research
+    report = research_urls_to_report(tool_context, [url])
+    
+    # 3. Generate Storyboard (Targeting a 1-minute video for the test)
+    storyboard = generate_slidecast_storyboard(tool_context, report, duration_minutes=1)
+    if "error" in storyboard:
+        return {"status": "error", "details": f"Storyboard generation failed: {storyboard['error']}"}
+
+    # 4. Preview Assets (Produces actual Images and Gemini TTS Audio)
+    preview_result = await preview_slidecast_assets(tool_context, storyboard)
+    if preview_result.get("status") == "error":
+        return preview_result
+
+    # 5. Finalize Video (Stitches images and audio into a cinematic MP4)
+    video_result = await finalize_slidecast_video(tool_context, preview_result["storyboard"])
+    
+    # 6. Create Image Composite (Stitches first two slides side-by-side for review)
+    slides = preview_result["storyboard"].get("slides", [])
+    image_urls = [s["image_url"] for s in slides[:2] if s.get("image_url")]
+    composite_url = None
+    if image_urls:
+        composite_result = await create_image_composite(tool_context, image_urls)
+        composite_url = composite_result.get("composite_url")
+    
+    return {
+        "status": "success",
+        "message": "Full Production Pipeline Validation Complete!",
+        "video_url": video_result.get("video_url"),
+        "composite_url": composite_url,
+        "report_summary": report[:500] + "...",
+        "details": f"Validated: Research, Storyboard ({len(slides)} slides), Audio (Gemini TTS), Video (FFmpeg), and Composite (Image Stitching)."
+    }

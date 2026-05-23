@@ -5,7 +5,7 @@
 The JPMC Marketing Assistant utilizes a sophisticated, four-phase pipeline to generate high-fidelity audio and synchronized visual captions for cinematic video ads. The process ensures that every 8-second cinematic act is accompanied by a professional-grade voiceover that aligns with brand tone and narrative pacing.
 
 1.  **Script Generation**: The Gemini model (acting as a "Lifestyle Documentary Director") generates an act-by-act script targeting 25 words per segment to ensure a natural speaking cadence that covers the full 8-second duration.
-2.  **Audio Synthesis**: The script is passed to Google Cloud Text-to-Speech (TTS) using the `en-US-Chirp3-HD` model, delivering a high-definition, emotional vocal performance.
+2.  **Audio Synthesis**: The script is passed to Google Cloud Text-to-Speech (TTS) using the `en-US-Journey` model, delivering a high-definition, emotional vocal performance.
 3.  **Dynamic Audio Mixing**: FFmpeg is used to professionally mix the voiceover with instrumental background music (generated via Lyria), applying specific volume levels (1.0 for vocal, 0.15 for music) to ensure clarity.
 4.  **Visual Synchronization**: Act-specific voiceover text is overlaid as on-screen cinematic captions, dynamically appearing and disappearing in sync with the cinematic acts.
 
@@ -28,9 +28,10 @@ The agent uses a "LIFESTYLE DOCUMENTARY DIRECTOR" persona. This forces the voice
 Once the script is finalized, it is sent to the `_generate_voiceover_audio` helper function.
 
 ### Implementation Details
-*   **Model**: `en-US-Chirp3-HD`. This is Google's most advanced, human-like voice model, optimized for long-form expressive content.
-*   **Voice**: Configurable via `.env` (defaults to `Charon`).
+*   **Model**: `en-US-Journey`. This is the Gemini-powered Text-to-Speech model, optimized for highly expressive and natural narration.
+*   **Voice**: Configurable via `.env` (defaults to `O`).
 *   **Audio Format**: Generated as a high-bitrate MP3 for compatibility.
+*   **Constraints**: Gemini TTS (Journey) voices **do not support SSML**, `speaking_rate`, `pitch`, or `volume_gain_db`. They are optimized for a fixed **24,000Hz** sample rate.
 
 ---
 
@@ -86,16 +87,16 @@ async def _generate_voiceover_audio(script: str):
     # Initialize the high-definition TTS client
     tts_client = texttospeech.TextToSpeechClient()
     
-    # Configure the 'Chirp' model for emotional, cinematic range
+    # Configure the 'Gemini TTS' model for highly expressive narration
     response = tts_client.synthesize_speech(
         input=texttospeech.SynthesisInput(text=script),
         voice=texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Chirp3-HD-Charon", # Premium high-def voice
+            name="en-US-Journey-O", # Gemini-powered authoritative voice
         ),
         audio_config=texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0, # Natural human speed
+            sample_rate_hertz=24000, # Journey voices are optimized for 24kHz
         ),
     )
     return response.audio_content

@@ -50,6 +50,7 @@ from .tools_media import (
     generate_display_ad,
     generate_campaign_storyboard,
     generate_video_from_storyboard,
+    create_image_composite,
 )
 from .tools_misc import (
     select_brand_preset,
@@ -57,6 +58,7 @@ from .tools_misc import (
     process_user_uploads,
     rename_asset_tag,
     deploy_react_website,
+    run_production_test,
 )
 
 from .tools_slidecast import (
@@ -65,6 +67,8 @@ from .tools_slidecast import (
     preview_slidecast_assets,
     finalize_slidecast_video,
     select_slidecast_style,
+    generate_slide_animation_plan,
+    execute_slide_animation,
 )
 
 # Import sub-agents
@@ -159,6 +163,11 @@ root_agent = Agent(
         generate_slidecast_storyboard,
         preview_slidecast_assets,
         finalize_slidecast_video,
+        select_slidecast_style,
+        generate_slide_animation_plan,
+        execute_slide_animation,
+        create_image_composite,
+        run_production_test,
         AgentTool(agent=trend_spotter_agent.agent),
     ],
 )

@@ -57,11 +57,51 @@ from .state import (
 from .utils_gcs import get_public_url, set_output_folder
 from .shared_infra.utils_media import (
     stitch_videos,
+    stitch_images,
     mix_audio_onto_video,
     overlay_logo_on_video,
     add_text_overlays,
     add_end_card_overlay,
 )
+
+...
+
+async def create_image_composite(tool_context: ToolContext, image_urls: list[str]) -> dict:
+    """Combines multiple images into a single horizontal composite (stitched) image for side-by-side review.
+    
+    Args:
+        image_urls: A list of public GCS URLs for the images to be combined.
+    """
+    current_output_folder = set_output_folder(tool_context)
+    log_message(f"Stitching {len(image_urls)} images into a composite...", Severity.INFO)
+
+    try:
+        image_bytes_list = []
+        for url in image_urls:
+            res = await utils_agents.load_resource(url, tool_context)
+            if res:
+                image_bytes_list.append(res.media_bytes)
+            else:
+                return {"status": "error", "details": f"Failed to load image at {url}"}
+
+        stitched_bytes = stitch_images(image_bytes_list)
+        if not stitched_bytes:
+            return {"status": "error", "details": "Image stitching failed."}
+
+        filename = f"composite_{int(time.time())}.png"
+        media = GeneratedMedia(filename=filename, mime_type="image/png", media_bytes=stitched_bytes)
+        saved = await utils_agents.save_to_artifact_and_render_asset(
+            asset=media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+        )
+        
+        return {
+            "status": "success",
+            "composite_url": get_public_url(saved.gcs_uri),
+            "details": "Images stitched successfully into a side-by-side composite."
+        }
+    except Exception as e:
+        log_message(f"Composite generation failed: {e}", Severity.ERROR)
+        return {"status": "error", "details": str(e)}
 
 # Initialize GenAI Client - Force global location to match source and support preview models
 client = genai.Client(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location="global")
@@ -286,7 +326,17 @@ async def _generate_voiceover_audio(script: str, voice_name: str = None) -> byte
 
         # Fallback to the default environment variable if no specific voice provided
         selected_voice = voice_name or GEMINI_TTS_VOICE
-        log_message(f"Generating voiceover using voice '{selected_voice}' for script: {script[:50]}...", Severity.INFO)
+
+        # Construct the full voice name using the model and selected voice
+        # Special handling for Gemini Journey voices (single letters D, F, O, P, Q)
+        if selected_voice in ["D", "F", "O", "P", "Q"]:
+            voice_full_name = f"en-US-Journey-{selected_voice}"
+        elif selected_voice.startswith(GEMINI_TTS_MODEL):
+            voice_full_name = selected_voice
+        else:
+            voice_full_name = f"{GEMINI_TTS_MODEL}-{selected_voice}"
+
+        log_message(f"Generating voiceover using voice '{voice_full_name}' for script: {script[:50]}...", Severity.INFO)
         
         for attempt in range(3):
             try:
@@ -295,11 +345,11 @@ async def _generate_voiceover_audio(script: str, voice_name: str = None) -> byte
                     input=texttospeech.SynthesisInput(text=script),
                     voice=texttospeech.VoiceSelectionParams(
                         language_code="en-US",
-                        name=f"en-US-Chirp3-HD-{selected_voice}",
+                        name=voice_full_name,
                     ),
                     audio_config=texttospeech.AudioConfig(
                         audio_encoding=texttospeech.AudioEncoding.MP3,
-                        speaking_rate=1.0,
+                        sample_rate_hertz=24000,
                     ),
                 )
                 if response.audio_content:
@@ -512,7 +562,7 @@ async def generate_campaign_storyboard(
             storyboard_uris.append(uri)
             
             media = GeneratedMedia(filename=filename, mime_type="image/png", media_bytes=img_bytes)
-            await utils_agents.save_to_artifact_and_render_asset(asset=media, context=tool_context, save_in_gcs=False, save_in_artifacts=True)
+            await utils_agents.save_to_artifact_and_render_asset(asset=media, context=tool_context, save_in_gcs=False, save_in_artifacts=False)
 
     tool_context.state["STORYBOARD_KEYFRAMES"] = storyboard_uris
     return {
@@ -617,7 +667,7 @@ async def generate_display_ad(
         if result and result.get("status") == "success" and result.get("image_bytes"):
             generated_media = GeneratedMedia(filename=result["file_name"], mime_type="image/png", media_bytes=result["image_bytes"])
             generated_media = await utils_agents.save_to_artifact_and_render_asset(
-                asset=generated_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+                asset=generated_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
             )
             final_urls.append(get_public_url(generated_media.gcs_uri))
 
@@ -715,7 +765,7 @@ async def generate_video_from_storyboard(
 
     filename = f"video_ad_final_{int(time.time())}.mp4"
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=final)
-    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder)
+    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder)
 
     return {"status": "success", "gcs_url": get_public_url(f"{current_output_folder}/{filename}")}
 
