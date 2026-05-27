@@ -444,9 +444,6 @@ async def save_to_artifact_and_render_asset(
 
     store_inline_artifact_metadata(context, asset)
 
-    # CRITICAL: Clear media_bytes before returning to prevent binary leakage into agent context
-    asset.media_bytes = None
-
     return asset
 
 

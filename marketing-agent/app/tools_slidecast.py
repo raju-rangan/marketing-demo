@@ -234,66 +234,13 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         sb.slides = [r[0] for r in results]
         slide_images = [r[1] for r in results]
 
-        # 3. Generate HTML Approval Page
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Slidecast Approval - {sb.title}</title>
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f4f7f9; color: #333; }}
-                h1 {{ color: #004a99; border-bottom: 2px solid #004a99; padding-bottom: 10px; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
-                th, td {{ padding: 20px; text-align: left; border-bottom: 1px solid #eee; }}
-                th {{ background-color: #004a99; color: white; text-transform: uppercase; letter-spacing: 1px; }}
-                tr:hover {{ background-color: #f9f9f9; }}
-                .slide-img {{ width: 320px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.2s; }}
-                .slide-img:hover {{ transform: scale(1.05); }}
-                .slide-num {{ font-size: 1.5em; font-weight: bold; color: #004a99; }}
-                .talk-track {{ line-height: 1.6; font-size: 1.1em; color: #444; }}
-                .audio-link {{ display: block; margin-top: 10px; color: #007bff; text-decoration: none; font-size: 0.9em; }}
-                .audio-link:hover {{ text-decoration: underline; }}
-            </style>
-        </head>
-        <body>
-            <h1>Slidecast Approval Page: {sb.title}</h1>
-            <p>Please review the visual assets and narration tracks for each slide below. Once reviewed, return to the agent to approve or request changes.</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">#</th>
-                        <th style="width: 350px;">Visual Asset</th>
-                        <th>Talk Track (Narration)</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        for i, slide in enumerate(sb.slides):
-            html_content += f"""
-                    <tr>
-                        <td class="slide-num">{i+1}</td>
-                        <td>
-                            <img src="{slide.image_url}" class="slide-img" alt="Slide {i+1}">
-                            <a href="{slide.audio_url}" class="audio-link" target="_blank">🔊 Listen to Audio Preview</a>
-                        </td>
-                        <td class="talk-track">{slide.script}</td>
-                    </tr>
-            """
-        html_content += """
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
+        # 3. Generate HTML Approval Page (DISABLED - Taking too much time)
+        # html_content = f"""
+        # <!DOCTYPE html>
+        # ... (rest of HTML logic commented out) ...
+        # """
 
-        # Save HTML as artifact (GCS ONLY - Avoid large byte attachments in response)
-        html_media = GeneratedMedia(filename="approval_page.html", mime_type="text/html", media_bytes=html_content.encode("utf-8"))
-        saved_html = await utils_agents.save_to_artifact_and_render_asset(
-            asset=html_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
-        )
-        approval_url = get_public_url(saved_html.gcs_uri)
-
-        # 4. Generate PDF Approval Page (GCS ONLY - Avoid large byte attachments in response)
+        # 4. Generate PDF Approval Page (RE-ENABLED per user request)
         pdf_bytes = _generate_approval_pdf(sb.title, sb.slides, slide_images)
         pdf_media = GeneratedMedia(filename="approval_document.pdf", mime_type="application/pdf", media_bytes=pdf_bytes)
         saved_pdf = await utils_agents.save_to_artifact_and_render_asset(
@@ -303,8 +250,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
 
         return {
             "status": "success",
-            "message": "Assets generated. Please review the HTML approval page or download the PDF document below.",
-            "approval_page_url": approval_url,
+            "message": "Assets and PDF approval document generated successfully. Please review the storyboard below or download the PDF.",
             "approval_pdf_url": pdf_url,
             "storyboard": sb.model_dump()
         }
@@ -373,8 +319,10 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     filename = f"slidecast_final_{int(time.time())}.mp4"
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=video_bytes)
 
+    # CRITICAL: We must save the final video as an artifact (binary stream) because the 
+    # artifact bucket is private and Signed URLs are failing in production.
     saved_video = await utils_agents.save_to_artifact_and_render_asset(
-        asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+        asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
     )
     url = get_public_url(saved_video.gcs_uri)
     return {"status": "success", "video_url": url, "details": "Slidecast masterclass finalized and ready for viewing."}

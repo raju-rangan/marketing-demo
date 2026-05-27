@@ -61,7 +61,6 @@ SAPPHIRE_CARD_URI = get_optional_env_var("SAPPHIRE_CARD_URI", "")
 FREEDOM_CARD_URI = get_optional_env_var("FREEDOM_CARD_URI", "")
 PRIVATE_WEALTH_CARD_URI = get_optional_env_var("PRIVATE_WEALTH_CARD_URI", "")
 
-CDN_HOST = get_optional_env_var("CDN_HOST", "")
 OUTPUT_FOLDER = "generated"
 
 # ============================================================

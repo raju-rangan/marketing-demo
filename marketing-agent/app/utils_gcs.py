@@ -15,27 +15,29 @@
 import datetime
 import os
 import google.auth
-from google.cloud import storage as gcs_storage
+from google.auth.transport.requests import Request
 from google.auth import impersonated_credentials
+from google.cloud import storage as gcs_storage
 from .state import (
     GOOGLE_CLOUD_PROJECT,
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
-    CDN_HOST,
-    OUTPUT_FOLDER,
     PRODUCT_COMPANY_NAME_STATE_KEY,
 )
 from .adk_common.utils.utils_logging import Severity, log_message
 from .adk_common.utils import utils_agents
 
 def get_public_url(blob_path: str) -> str:
-    return blob_path
-    """Returns a CDN URL if CDN_HOST is set. Otherwise, generates a secure Signed URL using IAM."""
+    """Generates a secure Signed URL using IAM impersonation (Delegated method)."""
     if not blob_path:
         return ""
 
-    # 1. Extract raw object path and bucket name
+    # 1. Clean and Extract Path
     raw_path = blob_path
     bucket_name = GOOGLE_CLOUD_BUCKET_ARTIFACTS
+
+    # Strip existing query parameters to avoid double-signing or path corruption
+    if "?" in raw_path:
+        raw_path = raw_path.split("?", 1)[0]
 
     if raw_path.startswith("gs://"):
         trimmed = raw_path[5:]
@@ -50,69 +52,79 @@ def get_public_url(blob_path: str) -> str:
         parts = raw_path.split("storage.googleapis.com/", 1)[1].split("/", 1)
         if len(parts) > 1:
             bucket_name, raw_path = parts[0], parts[1]
-    elif raw_path.startswith(bucket_name + "/"):
-        parts = raw_path.split("/", 1)
-        if len(parts) > 1:
-            raw_path = parts[1]
 
-    if CDN_HOST:
-        return f"https://{CDN_HOST}/{raw_path}"
-        
+    # Ensure no leading slashes which break the signature
+    raw_path = raw_path.lstrip("/")
+
     # 2. Generate a Signed URL using IAM
     try:
-        # Use PROJECT_ID (string) if available, fallback to GOOGLE_CLOUD_PROJECT
         project_id = os.environ.get("PROJECT_ID") or GOOGLE_CLOUD_PROJECT
         credentials, _ = google.auth.default()
 
-        sa_email = getattr(credentials, "service_account_email", None)
-        # If the email is None or the literal string "default", resolve the real email via metadata.
-        if not sa_email or sa_email == "default":
-            try:
-                import urllib.request
-                req = urllib.request.Request(
-                    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
-                    headers={"Metadata-Flavor": "Google"}
-                )
-                with urllib.request.urlopen(req, timeout=2) as response:
-                    sa_email = response.read().decode("utf-8").strip()
-                    log_message(f"Resolved 'default' service account to: {sa_email}", Severity.INFO)
-            except Exception as e:
-                log_message(f"Could not resolve real SA email from metadata (expected on local/dev): {e}", Severity.DEBUG)
+        # --- HEAVY DIAGNOSTICS START ---
+        log_message("-" * 40, Severity.INFO)
+        log_message(f"[GCS DEBUG] PROJECT_ID: {project_id}", Severity.INFO)
+        signing_sa_env = os.environ.get("SIGNING_SERVICE_ACCOUNT")
+        log_message(f"[GCS DEBUG] SIGNING_SA_ENV: {signing_sa_env}", Severity.INFO)
+        
+        active_email = getattr(credentials, "service_account_email", "N/A")
+        log_message(f"[GCS DEBUG] Active Identity: {active_email}", Severity.INFO)
+        log_message(f"[GCS DEBUG] Credential Type: {type(credentials)}", Severity.INFO)
 
-        # If credentials lack a private key (e.g., ADC on Compute Engine / Vertex AI),
-        # we must impersonate the service account to sign URLs via the IAM API.
-        if not hasattr(credentials, "sign_bytes"):
-            if sa_email and sa_email != "default":
-                log_message(f"Using IAM impersonation for signing as: {sa_email}", Severity.INFO)
-                credentials = impersonated_credentials.Credentials(
-                    source_credentials=credentials,
-                    target_principal=sa_email,
-                    target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
-                )
-            else:
-                log_message(f"No private key and no specific SA email (currently: {sa_email}). Signing may fail.", Severity.WARNING)
+        # Ensure we have an active token for the source identity
+        if not credentials.token:
+            log_message("[GCS DEBUG] No token found, refreshing...", Severity.INFO)
+            credentials.refresh(Request())
+        
+        log_message(f"[GCS DEBUG] Token Length: {len(credentials.token) if credentials.token else 0}", Severity.INFO)
+        # --- HEAVY DIAGNOSTICS END ---
+
+        # DELEGATED SIGNING (Impersonation)
+        # We must use impersonated_credentials to ensure the signature matches the identity
+        if signing_sa_env and signing_sa_env != active_email:
+            log_message(f"[GCS DEBUG] Using Impersonated Credentials for: {signing_sa_env}", Severity.INFO)
+            credentials = impersonated_credentials.Credentials(
+                source_credentials=credentials,
+                target_principal=signing_sa_env,
+                target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            signer_email = signing_sa_env
+        else:
+            signer_email = active_email
+
+        log_message(f"[GCS DEBUG] Final Signer Identity: {signer_email}", Severity.INFO)
+
+        if not signer_email or signer_email == "default" or signer_email == "N/A":
+             log_message("[GCS DEBUG] No valid signer found, falling back to authenticated browser URL", Severity.WARNING)
+             return f"https://storage.cloud.google.com/{bucket_name}/{raw_path}"
 
         storage_client = gcs_storage.Client(project=project_id, credentials=credentials)
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(raw_path)
 
-        # The impersonated credential handles IAM-based signing automatically
-        signed_url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(days=7),
-            method="GET",
-            service_account_email=sa_email if sa_email != "default" else None
-        )
+        # Signing Configuration
+        # Reduce expiration to 12 hours (common security policy limit)
+        signed_url_args = {
+            "version": "v4",
+            "expiration": datetime.timedelta(hours=12),
+            "method": "GET",
+            "service_account_email": signer_email,
+        }
+        
+        # If NOT impersonating, pass the access_token for the direct signing API
+        if not isinstance(credentials, impersonated_credentials.Credentials):
+            signed_url_args["access_token"] = credentials.token
+
+        signed_url = blob.generate_signed_url(**signed_url_args)
+        log_message(f"[GCS] Signed URL generated for {raw_path}: {signed_url}", Severity.INFO)
         return signed_url
+
     except Exception as e:
-        # Fallback to standard public URL if signing fails
-        log_message(f"IAM Signing failed for {raw_path}: {e}", Severity.WARNING)
-        return f"https://storage.googleapis.com/{bucket_name}/{raw_path}"
+        log_message(f"[GCS ERROR] {raw_path}: {e}", Severity.WARNING)
+        return f"gs://{bucket_name}/{raw_path}"
 
 def set_output_folder(tool_context):
     """Sets global OUTPUT_FOLDER to {session_id}/{product_name}_{persona}/ for isolation."""
-    global OUTPUT_FOLDER
-    
     # 1. Isolate by Session ID (guarantees a unique ID per conversation)
     session_id = utils_agents.get_or_create_unique_session_id(tool_context)
     

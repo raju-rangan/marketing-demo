@@ -765,7 +765,7 @@ async def generate_video_from_storyboard(
 
     filename = f"video_ad_final_{int(time.time())}.mp4"
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=final)
-    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder)
+    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder)
 
     return {"status": "success", "gcs_url": get_public_url(f"{current_output_folder}/{filename}")}
 

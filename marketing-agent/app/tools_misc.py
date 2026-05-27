@@ -166,12 +166,24 @@ async def deploy_react_website(tool_context: ToolContext, brand_name: str, html_
     """Simulates deploying a React-based landing page for the campaign."""
     return {"status": "success", "url": "https://chase-demo-landing-page.web.app", "details": "Website deployed successfully!"}
 
-async def run_production_test(tool_context: ToolContext, url: str = "https://www.chase.com/personal/investments/curriculum/save-and-invest") -> dict:
-    """EASTER EGG: A special shortcut to test the full production pipeline (Research -> Storyboard -> Audio -> Video -> Stitching).
+async def run_production_test(tool_context: ToolContext, url: str = "https://www.chase.com/personal/investments/curriculum/save-and-invest", asset_uri: str = None) -> dict:
+    """EASTER EGG: A special shortcut to test the full production pipeline OR generate a signed URL for a specific asset.
     
     Args:
-        url: The URL to research and use as a basis for image generation.
+        url: The URL to research and use as a basis for image generation (for full test).
+        asset_uri: Optional. If provided, just generates a signed URL for this specific asset (e.g., gs://... or /samples/...).
     """
+    from .utils_gcs import get_public_url
+    
+    if asset_uri:
+        log_message(f"Generating signed URL for asset: {asset_uri}", Severity.INFO)
+        signed_url = get_public_url(asset_uri)
+        return {
+            "status": "success",
+            "message": f"Signed URL generated for {asset_uri}",
+            "signed_url": signed_url
+        }
+
     from .tools_slidecast import (
         research_urls_to_report, 
         generate_slidecast_storyboard, 
