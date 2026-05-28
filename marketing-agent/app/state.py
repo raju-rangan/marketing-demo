@@ -92,6 +92,8 @@ SLIDE_STYLES = {
     "Modern 3D Isometric": "Clean 3D isometric rendering, soft claymorphism style. Matte pastel textures, smooth rounded edges, and soft, diffused studio lighting. Clean solid-color background. Visually pleasing, friendly, and highly legible. Emphasize playful, modern educational UI/UX design.",
     "Documentary Realism": "High-quality documentary-style photography. Bright, even, and natural lighting. Authentic, real-world environments like modern classrooms, bright living rooms, or collaborative workspaces. Shallow depth of field to keep the subject in focus while blurring the background. Clean, professional, and highly trustworthy.",
     "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts.",
+    "Minimalist Low-Poly 3D": "A minimalist 3D low-poly render, characterized by subjects and environments constructed from visible, flat-shaded polygons. Use soft, diffuse lighting and a shallow depth of field to focus on the central subject. The color palette should be harmonious and slightly muted, contributing to a clean, modern, and approachable aesthetic.",
+    "Stop-Motion Claymation": "A charming stop-motion clay animation scene. The aesthetic is defined by soft, malleable clay textures with visible handmade imperfections. Use even, soft studio lighting and a simple, focused color palette to emphasize the tactile, handmade quality of the models."
 }
 
 VOICEOVER_STYLES = {
