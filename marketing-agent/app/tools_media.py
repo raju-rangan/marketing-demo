@@ -96,7 +96,7 @@ async def create_image_composite(tool_context: ToolContext, image_urls: list[str
         
         return {
             "status": "success",
-            "composite_url": get_public_url(saved.gcs_uri),
+            "composite_url": utils_gcs.normalize_to_gs_bucket_uri(saved.gcs_uri),
             "details": "Images stitched successfully into a side-by-side composite."
         }
     except Exception as e:
@@ -669,7 +669,7 @@ async def generate_display_ad(
             generated_media = await utils_agents.save_to_artifact_and_render_asset(
                 asset=generated_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
             )
-            final_urls.append(get_public_url(generated_media.gcs_uri))
+            final_urls.append(utils_gcs.normalize_to_gs_bucket_uri(generated_media.gcs_uri))
 
     return {"status": "success", "image_urls": final_urls}
 

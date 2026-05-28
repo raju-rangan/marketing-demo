@@ -211,7 +211,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         saved_img = await utils_agents.save_to_artifact_and_render_asset(
             asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
-        slide.image_url = get_public_url(saved_img.gcs_uri)
+        slide.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved_img.gcs_uri)
 
         # 2. Generate Voiceover
         vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
@@ -223,7 +223,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         saved_aud = await utils_agents.save_to_artifact_and_render_asset(
             asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
-        slide.audio_url = get_public_url(saved_aud.gcs_uri)
+        slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
 
         return slide, img_bytes
 
@@ -429,8 +429,9 @@ async def execute_slide_animation(tool_context: ToolContext, animation_plan: dic
         saved = await utils_agents.save_to_artifact_and_render_asset(
             asset=media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
-        phase.image_url = get_public_url(saved.gcs_uri)
+        phase.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved.gcs_uri)
         image_urls.append(phase.image_url)
+
 
     if not image_urls:
         return {"status": "error", "details": "No frames generated successfully."}

@@ -104,10 +104,10 @@ def _dynamic_instruction_provider(context: ReadonlyContext) -> str:
     prompt = prompt.replace("{{ASSET_REGISTRY_SUMMARY}}", registry_summary)
     
     # Inject JPMC brand assets
-    prompt = prompt.replace("{{JPMC_LOGO_URI}}", get_public_url(JPMC_LOGO_URI) if JPMC_LOGO_URI else "")
-    prompt = prompt.replace("{{SAPPHIRE_CARD_URI}}", get_public_url(SAPPHIRE_CARD_URI) if SAPPHIRE_CARD_URI else "")
-    prompt = prompt.replace("{{FREEDOM_CARD_URI}}", get_public_url(FREEDOM_CARD_URI) if FREEDOM_CARD_URI else "")
-    prompt = prompt.replace("{{PRIVATE_WEALTH_CARD_URI}}", get_public_url(PRIVATE_WEALTH_CARD_URI) if PRIVATE_WEALTH_CARD_URI else "")
+    prompt = prompt.replace("{{JPMC_LOGO_URI}}", JPMC_LOGO_URI if JPMC_LOGO_URI else "")
+    prompt = prompt.replace("{{SAPPHIRE_CARD_URI}}", SAPPHIRE_CARD_URI if SAPPHIRE_CARD_URI else "")
+    prompt = prompt.replace("{{FREEDOM_CARD_URI}}", FREEDOM_CARD_URI if FREEDOM_CARD_URI else "")
+    prompt = prompt.replace("{{PRIVATE_WEALTH_CARD_URI}}", PRIVATE_WEALTH_CARD_URI if PRIVATE_WEALTH_CARD_URI else "")
     
     return prompt
 

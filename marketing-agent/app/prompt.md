@@ -148,8 +148,9 @@ When the user asks to create an educational video or "Slidecast" from URLs:
    - Present the slide sequence and narration scripts to the user.
 3. **Asset Preview (MANDATORY)**: 
    - Once the user approves the text-based plan, call `preview_slidecast_assets`.
-   - This will generate the **actual images (infographics)** and **audio clips** for every slide.
-   - Present these side-by-side: "Here are the generated infographics and the final talk tracks. Please review them for visual accuracy and tone."
+   - This will generate the **actual images (infographics)** and **audio clips** for every slide, and compile them into an Approval PDF.
+   - You MUST present the generated PDF URL to the user for approval: "Here is the PDF containing the generated infographics and the final talk tracks. Please review it for visual accuracy and tone before we render the final video."
+   - Do NOT attempt to display or render the individual slide images or audio clips in the chat. Only provide the link to the Approval PDF.
 4. Finalization: 
    - After the user approves the visual assets, call `finalize_slidecast_video`.
    - This compiles everything into the final MP4 with background music and the JPMC logo.

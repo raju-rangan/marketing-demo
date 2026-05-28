@@ -198,10 +198,12 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             inputs.extend(["-i", vo_path])
             # Correctly calculate the input index (0-based)
             vo_idx = (len(inputs) // 2) - 1
+            log_message(f"Mixing VO from {vo_path} (input {vo_idx})", Severity.INFO)
             filter_complex.append(f"[{vo_idx}:a]volume=1.0[vo]")
             audio_sources.append("[vo]")
         elif has_orig_audio:
             # If no new VO provided, keep original audio
+            log_message("Mixing original audio from video (input 0)", Severity.INFO)
             filter_complex.append(f"[0:a]volume=1.0[orig_a]")
             audio_sources.append("[orig_a]")
 
@@ -213,6 +215,7 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             inputs.extend(["-i", music_path])
             # Correctly calculate the input index (0-based)
             music_idx = (len(inputs) // 2) - 1
+            log_message(f"Mixing Music from {music_path} (input {music_idx})", Severity.INFO)
             filter_complex.append(f"[{music_idx}:a]volume=0.06[bgm]")
             audio_sources.append("[bgm]")
 
