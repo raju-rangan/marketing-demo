@@ -5,7 +5,7 @@ from typing import List
 
 from google.adk.tools.tool_context import ToolContext
 from .adk_common.dtos.generated_media import GeneratedMedia
-from .adk_common.utils import utils_agents
+from .adk_common.utils import utils_agents, utils_gcs
 from .adk_common.utils.utils_logging import Severity, log_message
 from google import genai
 from google.genai import types
@@ -67,8 +67,12 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
         
         # Add Image
         with io.BytesIO(img_bytes) as img_io:
-            # We use a temporary filename or just pass the stream if supported by fpdf2
-            pdf.image(img_io, x=15, w=100)
+            try:
+                # We use a temporary filename or just pass the stream if supported by fpdf2
+                pdf.image(img_io, x=15, w=100)
+            except Exception as e:
+                log_message(f"Error adding image to PDF: {repr(e)}", Severity.ERROR)
+                raise
         
         pdf.ln(5)
         pdf.set_font("helvetica", "B", 12)
@@ -134,6 +138,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"- Use formal, professional {language} appropriate for an executive educational video.\n\n"
         f"STRUCTURE REQUIREMENTS:\n"
         f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic in {language} and a welcoming, high-level introduction narration in {language}.\n"
+        f"- FINAL SLIDE MUST BE A SUMMARY/CONCLUSION SLIDE: It must summarize the key takeaways in a logical manner and bring the presentation to a smooth, definitive close, avoiding any abrupt endings. If the article has an existing conclusion or summary, use that.\n"
         f"- TOTAL SLIDES: {num_slides} slides total.\n"
         f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt.\n\n"
         f"DURATION & WORD COUNT TARGETS:\n"
@@ -142,7 +147,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"- Target per slide: ~{words_per_slide} words of detailed narration.\n\n"
         f"CORE DIRECTIVES:\n"
         f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
-        f"2. NARRATION: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. Do NOT be concise.\n"
+        f"2. NARRATION & GROUNDING: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. The narrative MUST be strictly grounded in the provided Research Report and original articles. Do not include external facts, unverified claims, or information not present in the original research. Do NOT be concise.\n"
         f"3. BRANDING: Use {company_name}'s color palette (e.g., Chase Blue/White) for all designs.\n"
         f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
         f"Research Report:\n{research_report}\n\n"
@@ -213,18 +218,6 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         )
         slide.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved_img.gcs_uri)
 
-        # 2. Generate Voiceover
-        vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
-        if not vo_bytes:
-            raise ValueError(f"Failed to generate voiceover for slide {idx+1}")
-
-        # Save audio as artifact
-        aud_media = GeneratedMedia(filename=f"audio_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
-        saved_aud = await utils_agents.save_to_artifact_and_render_asset(
-            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
-        )
-        slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
-
         return slide, img_bytes
 
     try:
@@ -268,24 +261,46 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     except Exception as e:
         return {"status": "error", "details": f"Invalid storyboard format: {e}"}
 
+    # Style selection for voiceover
+    selected_voice_name = tool_context.state.get(CHOSEN_VOICEOVER_STYLE_STATE_KEY, "Energetic & Engaging")
+    voice_id = VOICEOVER_STYLES.get(selected_voice_name, VOICEOVER_STYLES["Energetic & Engaging"])
+
     # Download/Prepare bytes for compilation
-    slides_data = []
-    for i, slide in enumerate(sb.slides):
-        if not slide.image_url or not slide.audio_url:
-            return {"status": "error", "details": f"Slide {i+1} is missing generated assets. Run preview first."}
-
-        # Load from GCS/Cache
+    async def prepare_slide_data(slide: SlidecastSlide, idx: int):
+        if not slide.image_url:
+            raise ValueError(f"Slide {idx+1} is missing generated image assets. Run preview first.")
+        
+        # Load image from GCS
         img_res = await utils_agents.load_resource(slide.image_url, tool_context)
-        aud_res = await utils_agents.load_resource(slide.audio_url, tool_context)
+        if not img_res:
+             raise ValueError(f"Failed to retrieve image for slide {idx+1}.")
+        
+        log_message(f"Generating final voiceover for slide {idx+1}...", Severity.INFO)
+        vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
+        if not vo_bytes:
+             raise ValueError(f"Failed to generate voiceover for slide {idx+1}.")
+        
+        # Save audio as artifact
+        aud_media = GeneratedMedia(filename=f"audio_final_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
+        saved_aud = await utils_agents.save_to_artifact_and_render_asset(
+            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+        )
+        slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
 
-        if not img_res or not aud_res:
-             return {"status": "error", "details": f"Failed to retrieve assets for slide {i+1}."}
-
-        slides_data.append({
+        return {
             "image_bytes": img_res.media_bytes,
-            "audio_bytes": aud_res.media_bytes,
+            "audio_bytes": vo_bytes,
             "text_overlay": "" 
-        })
+        }
+
+    try:
+        slide_tasks = [prepare_slide_data(slide, i) for i, slide in enumerate(sb.slides)]
+        slides_data = await asyncio.gather(*slide_tasks)
+    except Exception as e:
+        import traceback
+        tb_str = traceback.format_exc()
+        log_message(f"Finalization failed during asset prep: {repr(e)}\nTraceback:\n{tb_str}", Severity.ERROR)
+        return {"status": "error", "details": str(e)}
 
     # Music & Logo
     music_prompt = sb.music_prompt or "Cinematic instrumental background music"
