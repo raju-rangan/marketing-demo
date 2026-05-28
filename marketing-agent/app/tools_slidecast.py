@@ -1,6 +1,8 @@
 import asyncio
 import json
 import time
+import tempfile
+import os
 from typing import List
 
 from google.adk.tools.tool_context import ToolContext
@@ -66,13 +68,19 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
         pdf.ln(5)
         
         # Add Image
-        with io.BytesIO(img_bytes) as img_io:
-            try:
-                # We use a temporary filename or just pass the stream if supported by fpdf2
-                pdf.image(img_io, x=15, w=100)
-            except Exception as e:
-                log_message(f"Error adding image to PDF: {repr(e)}", Severity.ERROR)
-                raise
+        temp_img_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                temp_file.write(img_bytes)
+                temp_img_path = temp_file.name
+            
+            pdf.image(temp_img_path, x=15, w=100)
+        except Exception as e:
+            log_message(f"Error adding image to PDF: {repr(e)}", Severity.ERROR)
+            raise
+        finally:
+            if temp_img_path and os.path.exists(temp_img_path):
+                os.remove(temp_img_path)
         
         pdf.ln(5)
         pdf.set_font("helvetica", "B", 12)
@@ -189,8 +197,86 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         log_message(f"Storyboard generation failed: {e}", Severity.ERROR)
         return {"error": str(e)}
 
+def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_index: int, instructions: str) -> dict:
+    """Updates a specific slide in the storyboard based on user instructions, ensuring narrative continuity.
+    Clears the image_url and audio_url for the updated slide so they will be regenerated.
+    """
+    log_message(f"Surgically updating slide {slide_index + 1}...", Severity.INFO)
+    
+    try:
+        sb = SlidecastStoryboard.model_validate(storyboard)
+    except Exception as e:
+        return {"status": "error", "details": f"Invalid storyboard format: {e}"}
+
+    if slide_index < 0 or slide_index >= len(sb.slides):
+         return {"status": "error", "details": f"Invalid slide index {slide_index}. Must be between 0 and {len(sb.slides)-1}."}
+
+    target_slide = sb.slides[slide_index]
+    
+    # Gather context from surrounding slides for continuity
+    context_str = ""
+    if slide_index > 0:
+        prev_slide = sb.slides[slide_index - 1]
+        context_str += f"\n[PREVIOUS SLIDE - Slide {slide_index}]:\nTitle: {prev_slide.slide_title}\nScript: {prev_slide.script}\n"
+    
+    context_str += f"\n[CURRENT SLIDE TO UPDATE - Slide {slide_index + 1}]:\nTitle: {target_slide.slide_title}\nImage Prompt: {target_slide.image_prompt}\nScript: {target_slide.script}\n"
+    
+    if slide_index < len(sb.slides) - 1:
+        next_slide = sb.slides[slide_index + 1]
+        context_str += f"\n[NEXT SLIDE - Slide {slide_index + 2}]:\nTitle: {next_slide.slide_title}\nScript: {next_slide.script}\n"
+
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
+
+    prompt = (
+        f"You are an expert Educational Producer for {company_name}.\n"
+        f"The user has requested an update to ONE specific slide (Slide {slide_index + 1}) in a larger Slidecast presentation.\n\n"
+        f"USER INSTRUCTIONS:\n{instructions}\n\n"
+        f"CONTEXT (For Continuity):\n{context_str}\n\n"
+        f"TASK:\n"
+        f"Rewrite ONLY Slide {slide_index + 1}. Ensure the new script flows seamlessly from the previous slide and leads naturally into the next slide. Update the image prompt if the user's instructions affect the visuals.\n\n"
+        f"Output ONLY valid JSON matching this schema for the single updated slide:\n"
+        f"{{\n"
+        f"  \"slide_title\": \"[Concise Slide Title]\",\n"
+        f"  \"image_prompt\": \"[Updated image prompt...]\",\n"
+        f"  \"script\": \"[Updated detailed educational narration flowing from previous to next...]\",\n"
+        f"  \"text_overlay\": \"\" \n"
+        f"}}"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.1-pro-preview",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                response_mime_type="application/json",
+            ),
+        )
+        updated_slide_data = json.loads(response.text)
+        
+        # Apply updates
+        sb.slides[slide_index].slide_title = updated_slide_data.get("slide_title", target_slide.slide_title)
+        sb.slides[slide_index].image_prompt = updated_slide_data.get("image_prompt", target_slide.image_prompt)
+        sb.slides[slide_index].script = updated_slide_data.get("script", target_slide.script)
+        sb.slides[slide_index].text_overlay = updated_slide_data.get("text_overlay", target_slide.text_overlay)
+        
+        # CRITICAL: Clear URLs so preview/finalize tools know to regenerate these assets
+        sb.slides[slide_index].image_url = None
+        sb.slides[slide_index].audio_url = None
+        
+        return {
+            "status": "success",
+            "message": f"Slide {slide_index + 1} updated successfully for continuity. Assets will be regenerated upon next preview.",
+            "storyboard": sb.model_dump()
+        }
+    except Exception as e:
+        log_message(f"Slide update failed: {e}", Severity.ERROR)
+        return {"status": "error", "details": str(e)}
+
 async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Generates actual images and voiceover audio for review."""
+    """Generates actual images for review and creates an approval PDF.
+    Supports partial regeneration by skipping images that already have a valid image_url.
+    """
     current_output_folder = set_output_folder(tool_context)
     log_message("Generating asset previews...", Severity.INFO)
 
@@ -199,47 +285,65 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
     except Exception as e:
         return {"status": "error", "details": f"Invalid storyboard format: {e}"}
 
-    # Style selection
-    selected_voice_name = tool_context.state.get(CHOSEN_VOICEOVER_STYLE_STATE_KEY, "Energetic & Engaging")
-    voice_id = VOICEOVER_STYLES.get(selected_voice_name, VOICEOVER_STYLES["Energetic & Engaging"])
-
     # Process slides in parallel
     async def process_slide(slide: SlidecastSlide, idx: int):
         log_message(f"Rendering preview for slide {idx+1}...", Severity.INFO)
-        # 1. Generate Image (logo-free)
-        img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image", aspect_ratio="16:9")
-        if not img_bytes:
-            raise ValueError(f"Failed to generate image for slide {idx+1}")
+        try:
+            # Skip image generation if we already have a valid URL for this slide
+            if slide.image_url:
+                log_message(f"Slide {idx+1} already has an image_url. Skipping image generation.", Severity.INFO)
+                img_res = await utils_agents.load_resource(slide.image_url, tool_context)
+                if not img_res:
+                    raise ValueError(f"Failed to load existing image for slide {idx+1}")
+                return slide, img_res.media_bytes
 
-        # Save image as artifact
-        img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
-        saved_img = await utils_agents.save_to_artifact_and_render_asset(
-            asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
-        )
-        slide.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved_img.gcs_uri)
+            # 1. Generate Image (logo-free)
+            img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image", aspect_ratio="16:9")
+            if not img_bytes:
+                log_message(f"Failed to generate image for slide {idx+1}", Severity.ERROR)
+                raise ValueError(f"Failed to generate image for slide {idx+1}")
 
-        return slide, img_bytes
+            # Save image as artifact
+            img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
+            saved_img = await utils_agents.save_to_artifact_and_render_asset(
+                asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+            )
+            slide.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved_img.gcs_uri)
+
+            return slide, img_bytes
+        except Exception as e:
+            log_message(f"Error during image processing for slide {idx+1}: {repr(e)}", Severity.ERROR)
+            raise
 
     try:
         slide_tasks = [process_slide(slide, i) for i, slide in enumerate(sb.slides)]
-        results = await asyncio.gather(*slide_tasks)
+        results = await asyncio.gather(*slide_tasks, return_exceptions=True)
+        
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                log_message(f"Task for slide {i+1} failed with exception: {repr(r)}", Severity.ERROR)
+                raise r
         
         sb.slides = [r[0] for r in results]
         slide_images = [r[1] for r in results]
 
-        # 3. Generate HTML Approval Page (DISABLED - Taking too much time)
-        # html_content = f"""
-        # <!DOCTYPE html>
-        # ... (rest of HTML logic commented out) ...
-        # """
+        log_message("Generating PDF Approval Page...", Severity.INFO)
+        # 4. Generate PDF Approval Page
+        try:
+            pdf_bytes = _generate_approval_pdf(sb.title, sb.slides, slide_images)
+        except Exception as e:
+            log_message(f"Error during PDF generation: {repr(e)}", Severity.ERROR)
+            raise
 
-        # 4. Generate PDF Approval Page (RE-ENABLED per user request)
-        pdf_bytes = _generate_approval_pdf(sb.title, sb.slides, slide_images)
-        pdf_media = GeneratedMedia(filename="approval_document.pdf", mime_type="application/pdf", media_bytes=pdf_bytes)
-        saved_pdf = await utils_agents.save_to_artifact_and_render_asset(
-            asset=pdf_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
-        )
-        pdf_url = get_public_url(saved_pdf.gcs_uri)
+        try:
+            pdf_media = GeneratedMedia(filename="approval_document.pdf", mime_type="application/pdf", media_bytes=pdf_bytes)
+            saved_pdf = await utils_agents.save_to_artifact_and_render_asset(
+                asset=pdf_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+            )
+            pdf_url = get_public_url(saved_pdf.gcs_uri)
+        except Exception as e:
+            log_message(f"Error saving PDF artifact: {repr(e)}", Severity.ERROR)
+            raise
 
         return {
             "status": "success",
@@ -248,11 +352,15 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
             "storyboard": sb.model_dump()
         }
     except Exception as e:
-        log_message(f"Preview generation failed: {e}", Severity.ERROR)
+        import traceback
+        tb_str = traceback.format_exc()
+        log_message(f"Preview generation failed: {repr(e)}\nTraceback:\n{tb_str}", Severity.ERROR)
         return {"status": "error", "details": str(e)}
 
 async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
-    """Compiles the approved assets into a final educational video with background music and logo."""
+    """Compiles the approved assets into a final educational video with background music and logo.
+    Supports partial regeneration by skipping audio generation if a valid audio_url is present.
+    """
     current_output_folder = set_output_folder(tool_context)
     log_message("Finalizing slidecast video production...", Severity.INFO)
 
@@ -265,7 +373,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     selected_voice_name = tool_context.state.get(CHOSEN_VOICEOVER_STYLE_STATE_KEY, "Energetic & Engaging")
     voice_id = VOICEOVER_STYLES.get(selected_voice_name, VOICEOVER_STYLES["Energetic & Engaging"])
 
-    # Download/Prepare bytes for compilation
+    # Download images and generate audio in parallel
     async def prepare_slide_data(slide: SlidecastSlide, idx: int):
         if not slide.image_url:
             raise ValueError(f"Slide {idx+1} is missing generated image assets. Run preview first.")
@@ -275,17 +383,25 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
         if not img_res:
              raise ValueError(f"Failed to retrieve image for slide {idx+1}.")
         
-        log_message(f"Generating final voiceover for slide {idx+1}...", Severity.INFO)
-        vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
-        if not vo_bytes:
-             raise ValueError(f"Failed to generate voiceover for slide {idx+1}.")
-        
-        # Save audio as artifact
-        aud_media = GeneratedMedia(filename=f"audio_final_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
-        saved_aud = await utils_agents.save_to_artifact_and_render_asset(
-            asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
-        )
-        slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
+        # Check if we already have the audio
+        if slide.audio_url:
+            log_message(f"Slide {idx+1} already has an audio_url. Skipping voiceover generation.", Severity.INFO)
+            aud_res = await utils_agents.load_resource(slide.audio_url, tool_context)
+            if not aud_res:
+                raise ValueError(f"Failed to load existing audio for slide {idx+1}")
+            vo_bytes = aud_res.media_bytes
+        else:
+            log_message(f"Generating final voiceover for slide {idx+1}...", Severity.INFO)
+            vo_bytes = await _generate_voiceover_audio(slide.script, voice_name=voice_id)
+            if not vo_bytes:
+                 raise ValueError(f"Failed to generate voiceover for slide {idx+1}.")
+            
+            # Save audio as artifact
+            aud_media = GeneratedMedia(filename=f"audio_final_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
+            saved_aud = await utils_agents.save_to_artifact_and_render_asset(
+                asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+            )
+            slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
 
         return {
             "image_bytes": img_res.media_bytes,
