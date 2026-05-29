@@ -137,8 +137,8 @@ When the user asks to create an educational video or "Slidecast" from URLs:
    - Call `research_urls_to_report(urls=[...])` and present the key insights.
 2. **Style Selection (NEW)**:
    - Before generating the storyboard, you MUST offer the user stylistic choices for the video.
-   - **Visual Styles**: 'Flat Vector Explainer' (Minimalist/2D), 'Modern 3D Isometric' (Playful/3D), 'Documentary Realism' (Professional Photography), 'Glassmorphism & Abstract Data' (Digital/High-Tech), 'Minimalist Low-Poly 3D' (Clean 3D/Low-Poly), 'Stop-Motion Claymation' (Tactile/Handmade).
-   - **Voiceover Options**: 'Energetic & Engaging', 'Professional & Trustworthy', 'Calm & Sophisticated', 'Authoritative & Wise'.
+   - **Visual Styles**: 'Flat Vector Explainer' (Minimalist/2D), 'Modern 3D Isometric' (Playful/3D), 'Documentary Realism' (Professional Photography), 'Stop-Motion Claymation' (Tactile/Handmade), 'Minimalist Low-Poly 3D' (Clean 3D/Low-Poly), 'Glassmorphism & Abstract Data' (Digital/High-Tech).
+   - **Voiceover Options**: 'Energetic & Engaging', 'Professional & Trustworthy', 'Calm & Sophisticated', 'Authoritative & Wise', 'Youthful & Fresh'.
    - **How to Offer**: *"I can produce your Slidecast in several professional styles. Which would you prefer for the visuals and the narration?"* 
    - List the options clearly. Once they choose, call `select_slidecast_style(slide_style=..., voiceover_style=...)`.
 3. **Master Plan Generation**: 
