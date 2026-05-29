@@ -91,16 +91,17 @@ SLIDE_STYLES = {
     "Flat Vector Explainer": "Clean, flat 2D vector illustration style. High-contrast, minimalist design with a bright, approachable color palette. Solid backgrounds with ample negative space for text and diagrams. No gradients or 3D shading; focus on clear visual communication and infographic-style simplicity.",
     "Modern 3D Isometric": "Clean 3D isometric rendering, soft claymorphism style. Matte pastel textures, smooth rounded edges, and soft, diffused studio lighting. Clean solid-color background. Visually pleasing, friendly, and highly legible. Emphasize playful, modern educational UI/UX design.",
     "Documentary Realism": "High-quality documentary-style photography. Bright, even, and natural lighting. Authentic, real-world environments like modern classrooms, bright living rooms, or collaborative workspaces. Shallow depth of field to keep the subject in focus while blurring the background. Clean, professional, and highly trustworthy.",
-    "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts.",
+    "Stop-Motion Claymation": "A charming stop-motion clay animation scene. The aesthetic is defined by soft, malleable clay textures with visible handmade imperfections. Use even, soft studio lighting and a simple, focused color palette to emphasize the tactile, handmade quality of the models.",
     "Minimalist Low-Poly 3D": "A minimalist 3D low-poly render, characterized by subjects and environments constructed from visible, flat-shaded polygons. Use soft, diffuse lighting and a shallow depth of field to focus on the central subject. The color palette should be harmonious and slightly muted, contributing to a clean, modern, and approachable aesthetic.",
-    "Stop-Motion Claymation": "A charming stop-motion clay animation scene. The aesthetic is defined by soft, malleable clay textures with visible handmade imperfections. Use even, soft studio lighting and a simple, focused color palette to emphasize the tactile, handmade quality of the models."
+    "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts."
 }
 
 VOICEOVER_STYLES = {
-    "Energetic & Engaging": "D", # Male (Energetic)
-    "Professional & Trustworthy": "F", # Female (Professional)
-    "Calm & Sophisticated": "F", # Female (Soft)
-    "Authoritative & Wise": "O", # Male (Authoritative)
+    "Energetic & Engaging": "Puck", # Upbeat
+    "Professional & Trustworthy": "Charon", # Informative
+    "Calm & Sophisticated": "Zephyr", # Bright/Soft
+    "Authoritative & Wise": "Kore", # Firm
+    "Youthful & Fresh": "Leda", # Youthful
 }
 
 CHOSEN_SLIDE_STYLE_STATE_KEY = "CHOSEN_SLIDE_STYLE"
