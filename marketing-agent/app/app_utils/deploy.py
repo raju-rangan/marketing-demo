@@ -114,6 +114,72 @@ def sync_assets(project_id: str, bucket_name: str, assets_dir: str = "app/assets
             click.echo(f"    - Uploaded {blob_path}")
     click.echo("  ✅ Asset synchronization complete.")
 
+def setup_signing_service_account(project_id: str, sa_email: str, agent_principal: str = None) -> None:
+    """Creates the signing service account and assigns necessary roles."""
+    import subprocess
+    
+    if not sa_email:
+        return
+
+    sa_name = sa_email.split('@')[0]
+    click.echo(f"\n🔧 Setting up Signing Service Account: {sa_email}")
+    
+    # 1. Create the Service Account (only on initial setup)
+    if not agent_principal:
+        click.echo(f"  - Creating service account: {sa_name}")
+        try:
+            res = subprocess.run([
+                "gcloud", "iam", "service-accounts", "create", sa_name,
+                "--display-name=Asset Signer for GCS",
+                f"--project={project_id}"
+            ], capture_output=True, text=True)
+            if res.returncode == 0:
+                click.echo("    ✅ Created successfully.")
+            elif "already exists" in res.stderr:
+                click.echo("    ✅ Already exists.")
+            else:
+                click.echo(f"    ⚠️ Failed to create: {res.stderr.strip()}")
+        except Exception as e:
+            click.echo(f"    ⚠️ Error executing gcloud: {e}")
+
+        # 2. Grant it storage access
+        click.echo(f"  - Granting roles/storage.objectViewer to {sa_email}")
+        try:
+            subprocess.run([
+                "gcloud", "projects", "add-iam-policy-binding", project_id,
+                f"--member=serviceAccount:{sa_email}",
+                "--role=roles/storage.objectViewer"
+            ], capture_output=True)
+            click.echo("    ✅ Role granted.")
+        except Exception:
+            pass
+    
+    # 3. Grant Impersonation Access
+    # If agent_principal is provided, grant it to the agent. Otherwise, grant it to the current user.
+    target_member = f"principal://{agent_principal}" if agent_principal and "principal://" not in agent_principal else agent_principal
+    
+    if not target_member:
+        try:
+            user_account_res = subprocess.run(["gcloud", "config", "get-value", "account"], check=True, capture_output=True, text=True)
+            user_account = user_account_res.stdout.strip()
+            if user_account:
+                target_member = f"user:{user_account}"
+        except Exception:
+            pass
+
+    if target_member:
+        click.echo(f"  - Granting impersonation access to: {target_member}")
+        try:
+            subprocess.run([
+                "gcloud", "iam", "service-accounts", "add-iam-policy-binding", sa_email,
+                f"--member={target_member}",
+                "--role=roles/iam.serviceAccountTokenCreator",
+                f"--project={project_id}"
+            ], capture_output=True)
+            click.echo(f"    ✅ Granted roles/iam.serviceAccountTokenCreator.")
+        except Exception as e:
+            click.echo(f"    ⚠️ Failed to setup impersonation: {e}")
+
 def generate_class_methods_from_agent(agent_instance: Any) -> list[dict[str, Any]]:
     """Generate method specifications with schemas from agent's register_operations().
 
@@ -389,6 +455,10 @@ def deploy_agent_engine_app(
         if v and k not in env_vars and k != "GOOGLE_CLOUD_PROJECT":
             env_vars[k] = v
 
+    # Setup the signing service account if configured
+    if project and env_vars.get("SIGNING_SERVICE_ACCOUNT"):
+        setup_signing_service_account(project, env_vars["SIGNING_SERVICE_ACCOUNT"])
+
     # Merge secrets into env_vars (secrets override plain env vars)
     env_vars.update(secrets)  # type: ignore
 
@@ -514,6 +584,13 @@ def deploy_agent_engine_app(
 
     write_deployment_metadata(remote_agent)
     print_deployment_success(remote_agent, location, project)
+
+    # CRITICAL: Grant the deployed agent identity permission to use the signing account
+    # This fixes the 'iam.serviceAccounts.signBlob' permission denied error in Gemini Enterprise.
+    if project and env_vars.get("SIGNING_SERVICE_ACCOUNT"):
+        agent_identity_val = remote_agent.api_resource.spec.effective_identity
+        if agent_identity_val:
+            setup_signing_service_account(project, env_vars["SIGNING_SERVICE_ACCOUNT"], agent_principal=agent_identity_val)
 
     return remote_agent
 
