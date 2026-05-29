@@ -357,9 +357,10 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         log_message(f"Preview generation failed: {repr(e)}\nTraceback:\n{tb_str}", Severity.ERROR)
         return {"status": "error", "details": str(e)}
 
-async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) -> dict:
+async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, animate_slides: bool = False) -> dict:
     """Compiles the approved assets into a final educational video with background music and logo.
     Supports partial regeneration by skipping audio generation if a valid audio_url is present.
+    If animate_slides is True, it will use Veo to animate each slide's keyframe.
     """
     current_output_folder = set_output_folder(tool_context)
     log_message("Finalizing slidecast video production...", Severity.INFO)
@@ -372,6 +373,8 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
     # Style selection for voiceover
     selected_voice_name = tool_context.state.get(CHOSEN_VOICEOVER_STYLE_STATE_KEY, "Energetic & Engaging")
     voice_id = VOICEOVER_STYLES.get(selected_voice_name, VOICEOVER_STYLES["Energetic & Engaging"])
+
+    from .tools_media import _generate_single_veo_clip
 
     # Download images and generate audio in parallel
     async def prepare_slide_data(slide: SlidecastSlide, idx: int):
@@ -397,14 +400,43 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict) 
                  raise ValueError(f"Failed to generate voiceover for slide {idx+1}.")
             
             # Save audio as artifact
-            aud_media = GeneratedMedia(filename=f"audio_final_{idx+1}.mp3", mime_type="audio/mpeg", media_bytes=vo_bytes)
+            aud_media = GeneratedMedia(filename=f"audio_final_{idx+1}.wav", mime_type="audio/wav", media_bytes=vo_bytes)
             saved_aud = await utils_agents.save_to_artifact_and_render_asset(
                 asset=aud_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
             )
             slide.audio_url = utils_gcs.normalize_to_gs_bucket_uri(saved_aud.gcs_uri)
 
+        # Animate the slide if requested
+        video_bytes = None
+        if animate_slides:
+            log_message(f"Animating slide {idx+1} with Veo...", Severity.INFO)
+            # STRICTly constrain Veo to prevent the slide layout/text from panning off screen.
+            # Focuses on diverse animations, character actions driven by script, and strict text preservation.
+            script_context = slide.script[:400].replace('\n', ' ').replace('"', "'")
+            motion_prompt = (
+                f"A STATIC, LOCKED-OFF CAMERA SHOT. The camera MUST NOT pan, tilt, zoom, or move in any way. "
+                f"The core layout, text, and composition MUST remain completely still and perfectly legible. "
+                f"Focus entirely on animating the EDUCATIONAL CONTENT on the screen using subtle, localized motion: "
+                f"1. Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing. "
+                f"2. Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process. "
+                f"3. Text & Highlights: Add a subtle sweeping sheen or soft illumination behind key bullet points or focus areas to draw the eye. "
+                f"4. Icons & Spot illustrations: Give educational icons gentle, localized cinemagraph-style motion (e.g., a globe slowly spinning, a gear slowly turning). "
+                f"5. TEXT PRESERVATION IS ABSOLUTE: DO NOT add, alter, morph, or hallucinate any text. All text MUST remain completely frozen and perfectly readable. "
+                f"Keep all motion subtle, professional, and strictly constrained to the data/content elements without altering the slide layout." 
+            )
+            video_bytes = await _generate_single_veo_clip(
+                prompt=motion_prompt, 
+                start_frame_gcs_uri=slide.image_url, 
+                clip_duration=8, 
+                end_frame_gcs_uri=slide.image_url, 
+                label=f"slide_anim_{idx+1}"
+            )
+            if not video_bytes:
+                log_message(f"Failed to animate slide {idx+1}. Falling back to static image.", Severity.WARNING)
+
         return {
             "image_bytes": img_res.media_bytes,
+            "video_bytes": video_bytes,
             "audio_bytes": vo_bytes,
             "text_overlay": "" 
         }
@@ -482,8 +514,7 @@ def select_slidecast_style(tool_context: ToolContext, slide_style: str = "Clean 
     }
 
 def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, duration_seconds: int = 5) -> dict:
-    """Generates a NanomationPlan (JSON) for a specific slide topic to create a 5-step progressive animation.
-    Based on the 'Nano Banana' (Imagen 3) concept of precise, consistent sequential image generation.
+    """Generates a NanomationPlan (JSON) for a specific slide topic using dynamic segments.
     """
     log_message(f"Planning nanomation for: {slide_topic}...", Severity.INFO)
     
@@ -491,18 +522,19 @@ def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, d
     
     prompt = (
         f"You are a Senior Motion Designer for {company_name}.\n"
-        f"Goal: Plan a 5-frame 'Nanomation' (consistent progressive animation) for the topic: '{slide_topic}'.\n\n"
-        f"CONCEPT (Nano Banana):\n"
-        f"- We will generate a sequence of 5 images showing a clear progression.\n"
-        f"- Each frame must build on the previous one with localized, precise changes.\n"
+        f"Goal: Plan a multi-segment video animation (Nanomation) for the topic: '{slide_topic}'.\n\n"
+        f"CONCEPT:\n"
+        f"- You must determine the logical number of segments based on the slide's content and voiceover length (typically 2 to 4 segments).\n"
+        f"- For each segment (phase), you will provide a starting 'image_prompt', a 'motion_prompt', and a 'duration_seconds'.\n"
+        f"- The video will be generated by smoothly interpolating between the image generated for segment N and the image generated for segment N+1.\n"
         f"- Target high consistency: The background and core subjects must remain stable while specific actions progress.\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
         f"{{\n"
         f"  \"target\": \"[High-level description of the entire animated sequence]\",\n"
         f"  \"progression_type\": \"linear\",\n"
         f"  \"phases\": [\n"
-        f"    {{\"description\": \"[Description of frame 1]\", \"image_prompt\": \"[Detailed prompt for Imagen 3]\"}},\n"
-        f"    {{\"description\": \"[Description of frame 2]\", \"image_prompt\": \"[Localized change from frame 1]\"}},\n"
+        f"    {{\"description\": \"[Description of segment 1]\", \"image_prompt\": \"[Detailed prompt for Imagen 3]\", \"motion_prompt\": \"[Cinematic motion directive]\", \"duration_seconds\": 4}},\n"
+        f"    {{\"description\": \"[Description of segment 2]\", \"image_prompt\": \"[End of seg 1/Start of seg 2]\", \"motion_prompt\": \"[Cinematic motion directive]\", \"duration_seconds\": 4}},\n"
         f"    ...\n"
         f"  ],\n"
         f"  \"topic\": \"{slide_topic}\"\n"
@@ -524,8 +556,7 @@ def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, d
         return {"error": str(e)}
 
 async def execute_slide_animation(tool_context: ToolContext, animation_plan: dict) -> dict:
-    """Executes a NanomationPlan by generating 5 consistent frames using a sequential feedback loop.
-    Each frame uses the previous frame as a reference to ensure 'surgical precision' consistency (Nano Banana).
+    """Executes a NanomationPlan by generating static keyframes and interpolating them using Veo.
     """
     current_output_folder = set_output_folder(tool_context)
     log_message("Executing nanomation sequence...", Severity.INFO)
@@ -535,42 +566,68 @@ async def execute_slide_animation(tool_context: ToolContext, animation_plan: dic
     except Exception as e:
         return {"status": "error", "details": f"Invalid plan: {e}"}
 
-    frames_bytes = []
-    image_urls = []
+    if not plan.phases:
+        return {"status": "error", "details": "No phases found in animation plan."}
+
+    # 1. Generate static images (keyframes)
+    images_bytes = []
+    image_uris = []
     
-    # Sequential Generation for Consistency (Nano Banana style)
-    # Each frame (after the first) uses the previous frame as a reference.
     for i, phase in enumerate(plan.phases):
-        log_message(f"Generating frame {i+1}/5: {phase.description}", Severity.INFO)
+        log_message(f"Generating keyframe {i+1}/{len(plan.phases)}: {phase.description}", Severity.INFO)
         
-        # Use previous frame as reference for surgical consistency
-        refs = [frames_bytes[-1]] if frames_bytes else []
-        
-        # Call the existing image generation tool
-        img_bytes = await _generate_gemini_image(phase.image_prompt, refs, label=f"nanomation_f{i+1}", aspect_ratio="16:9")
+        refs = [images_bytes[-1]] if images_bytes else []
+        img_bytes = await _generate_gemini_image(phase.image_prompt, refs, label=f"keyframe_f{i+1}", aspect_ratio="16:9")
         
         if not img_bytes:
-            log_message(f"Failed to generate frame {i+1}", Severity.ERROR)
-            break
+            log_message(f"Failed to generate keyframe {i+1}", Severity.ERROR)
+            return {"status": "error", "details": f"Failed to generate keyframe {i+1}."}
+            
+        images_bytes.append(img_bytes)
         
-        frames_bytes.append(img_bytes)
-        
-        # Save frame to registry/artifacts
-        media = GeneratedMedia(filename=f"nanomation_{int(time.time())}_{i+1}.png", mime_type="image/png", media_bytes=img_bytes)
+        media = GeneratedMedia(filename=f"keyframe_{int(time.time())}_{i+1}.png", mime_type="image/png", media_bytes=img_bytes)
         saved = await utils_agents.save_to_artifact_and_render_asset(
             asset=media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
         )
         phase.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved.gcs_uri)
-        image_urls.append(phase.image_url)
+        image_uris.append(phase.image_url)
 
-
-    if not image_urls:
-        return {"status": "error", "details": "No frames generated successfully."}
-
+    # 2. Generate Veo clips using interpolation
+    veo_tasks = []
+    from .tools_media import _generate_single_veo_clip
+    for i, phase in enumerate(plan.phases):
+        start_uri = image_uris[i]
+        end_uri = image_uris[i+1] if (i + 1) < len(image_uris) else None
+        
+        duration = phase.duration_seconds or 4
+        motion = phase.motion_prompt or "Cinematic smooth motion"
+        
+        veo_tasks.append(_generate_single_veo_clip(motion, start_uri, clip_duration=duration, end_frame_gcs_uri=end_uri, label=f"nanomation_seg_{i+1}"))
+    
+    log_message(f"Triggering {len(veo_tasks)} Veo generations in parallel...", Severity.INFO)
+    veo_results = await asyncio.gather(*veo_tasks)
+    
+    clips = [res for res in veo_results if res]
+    if not clips:
+        return {"status": "error", "details": "Veo generation failed for all segments."}
+        
+    # 3. Stitch the clips together
+    log_message(f"Stitching {len(clips)} video segments...", Severity.INFO)
+    from .shared_infra.utils_media import stitch_videos
+    stitched_video = stitch_videos(clips) if len(clips) > 1 else clips[0]
+    
+    if not stitched_video:
+        return {"status": "error", "details": "Failed to stitch video clips."}
+        
+    final_media = GeneratedMedia(filename=f"nanomation_stitched_{int(time.time())}.mp4", mime_type="video/mp4", media_bytes=stitched_video)
+    saved_final = await utils_agents.save_to_artifact_and_render_asset(
+        asset=final_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+    )
+    
     return {
         "status": "success",
-        "message": f"Nanomation sequence '{plan.topic}' generated successfully. Review the {len(image_urls)} frames below.",
+        "message": f"Nanomation video '{plan.topic}' generated successfully.",
         "plan": plan.model_dump(),
-        "image_urls": image_urls
+        "video_url": get_public_url(saved_final.gcs_uri)
     }
 
