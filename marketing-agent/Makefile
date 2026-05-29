@@ -10,12 +10,27 @@ install:
 	@command -v uv >/dev/null 2>&1 || { echo "uv is not installed. Installing uv..."; curl -LsSf https://astral.sh/uv/0.8.13/install.sh | sh; source $HOME/.local/bin/env; }
 	uv sync
 
+# Authenticate with Google Cloud and verify project consistency
+authenticate:
+	@echo "==============================================================================="
+	@echo "| 🔐 Authenticating with Google Cloud...                                      |"
+	@echo "==============================================================================="
+	gcloud auth login
+	gcloud auth application-default login
+	@AUTH_PROJECT=$$(gcloud config get-value project 2>/dev/null); \
+	if [ "$$AUTH_PROJECT" != "$(GOOGLE_CLOUD_PROJECT)" ]; then \
+		echo "❌ ERROR: Authenticated project ($$AUTH_PROJECT) does not match GOOGLE_CLOUD_PROJECT ($(GOOGLE_CLOUD_PROJECT)) in .env"; \
+		exit 1; \
+	fi; \
+	echo "✅ Authenticated project matches GOOGLE_CLOUD_PROJECT: $$AUTH_PROJECT"
+	gcloud auth application-default set-quota-project $(GOOGLE_CLOUD_PROJECT)
+
 # ==============================================================================
 # Playground Targets
 # ==============================================================================
 
 # Launch local dev playground
-playground:
+playground: authenticate
 	@echo "==============================================================================="
 	@echo "| 🚀 Starting your agent playground...                                        |"
 	@echo "|                                                                             |"
@@ -34,7 +49,7 @@ playground:
 
 # Deploy the agent remotely
 # Usage: make deploy [AGENT_IDENTITY=true] [SECRETS="KEY=SECRET_ID,..."] - Set AGENT_IDENTITY=true to enable per-agent IAM identity (Preview)
-deploy:
+deploy: authenticate
 	# Export dependencies to requirements file using uv export.
 	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > app/app_utils/.requirements.txt 2>/dev/null || \
 	uv export --no-hashes --no-header --no-dev --no-emit-project > app/app_utils/.requirements.txt) && \
