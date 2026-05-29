@@ -70,3 +70,4 @@ coverage.xml
 # Gemini CLI
 graphify-out/
 .gemini-workspace/
+marketing-agent/deployment_metadata.json
