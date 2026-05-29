@@ -202,12 +202,14 @@ async def _generate_gemini_image(prompt: str, reference_images: list[bytes], lab
                     if part.inline_data and part.inline_data.data:
                         return part.inline_data.data
         except Exception as e:
+            import traceback
             error_str = str(e)
+            full_error = traceback.format_exc()
             is_429 = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
             if is_429 and attempt < 4:
                 await asyncio.sleep((2 ** attempt) * 2 + random.uniform(0, 3))
                 continue
-            log_message(f"{label} failed: {e}", Severity.ERROR)
+            log_message(f"{label} failed. Type: {type(e).__name__}, Msg: {error_str}\nTraceback:\n{full_error}", Severity.ERROR)
             if attempt == 4: raise e
         
         await asyncio.sleep((attempt + 1) * 2)
@@ -318,43 +320,58 @@ async def _generate_lyria_music(lyria_prompt: str, product_name: str) -> bytes |
         return None
 
 async def _generate_voiceover_audio(script: str, voice_name: str = None) -> bytes | None:
-    """Generates voiceover audio using Cloud TTS Chirp3-HD."""
-    from google.cloud import texttospeech
+    """Generates voiceover audio using Gemini 3.1 Flash TTS Preview."""
+    import io
+    import wave
+    
+    def _pcm_to_wav(pcm_data: bytes, channels=1, rate=24000, sample_width=2) -> bytes:
+        with io.BytesIO() as wav_io:
+            with wave.open(wav_io, "wb") as wf:
+                wf.setnchannels(channels)
+                wf.setsampwidth(sample_width)
+                wf.setframerate(rate)
+                wf.writeframes(pcm_data)
+            return wav_io.getvalue()
+
     try:
         if not script or len(script.strip()) < 5:
             return None
 
-        # Fallback to the default environment variable if no specific voice provided
-        selected_voice = voice_name or GEMINI_TTS_VOICE
+        # Fallback to a default voice if none provided
+        selected_voice = voice_name or "Puck"
 
-        # Construct the full voice name using the model and selected voice
-        # Special handling for Gemini Journey voices (single letters D, F, O, P, Q)
-        if selected_voice in ["D", "F", "O", "P", "Q"]:
-            voice_full_name = f"en-US-Journey-{selected_voice}"
-        elif selected_voice.startswith(GEMINI_TTS_MODEL):
-            voice_full_name = selected_voice
-        else:
-            voice_full_name = f"{GEMINI_TTS_MODEL}-{selected_voice}"
+        log_message(f"Generating voiceover using Gemini TTS voice '{selected_voice}' for script: {script[:50]}...", Severity.INFO)
 
-        log_message(f"Generating voiceover using voice '{voice_full_name}' for script: {script[:50]}...", Severity.INFO)
-        
         for attempt in range(3):
             try:
-                tts_client = texttospeech.TextToSpeechClient()
-                response = tts_client.synthesize_speech(
-                    input=texttospeech.SynthesisInput(text=script),
-                    voice=texttospeech.VoiceSelectionParams(
-                        language_code="en-US",
-                        name=voice_full_name,
-                    ),
-                    audio_config=texttospeech.AudioConfig(
-                        audio_encoding=texttospeech.AudioEncoding.MP3,
-                        sample_rate_hertz=24000,
-                    ),
-                )
-                if response.audio_content:
-                    log_message(f"Voiceover generated: {len(response.audio_content)} bytes", Severity.INFO)
-                    return response.audio_content
+                def call_tts():
+                    return client.models.generate_content(
+                       model="gemini-3.1-flash-tts-preview",
+                       contents=script,
+                       config=types.GenerateContentConfig(
+                          response_modalities=["AUDIO"],
+                          speech_config=types.SpeechConfig(
+                             voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                   voice_name=selected_voice,
+                                )
+                             )
+                          ),
+                       )
+                    )
+
+                response = await asyncio.to_thread(call_tts)
+                
+                # Extract audio from response
+                if response.candidates and response.candidates[0].content:
+                    for part in response.candidates[0].content.parts:
+                        if part.inline_data and part.inline_data.data:
+                            pcm_bytes = part.inline_data.data
+                            log_message(f"Voiceover PCM generated: {len(pcm_bytes)} bytes", Severity.INFO)
+                            wav_bytes = _pcm_to_wav(pcm_bytes)
+                            return wav_bytes
+
+                log_message(f"TTS attempt {attempt + 1}/3 returned no audio data.", Severity.WARNING)
             except Exception as e:
                 log_message(f"TTS attempt {attempt + 1}/3 failed: {e}", Severity.WARNING)
             if attempt < 2:
