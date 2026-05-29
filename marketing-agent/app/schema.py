@@ -250,7 +250,10 @@ class SlidecastStoryboard(BaseModel):
 class NanomationPhase(BaseModel):
     description: str
     image_prompt: str
+    motion_prompt: Optional[str] = "Cinematic smooth motion"
+    duration_seconds: Optional[int] = 4
     image_url: Optional[str] = None
+    video_url: Optional[str] = None
 
 class NanomationPlan(BaseModel):
     target: str
