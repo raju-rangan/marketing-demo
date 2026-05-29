@@ -15,9 +15,9 @@
 import json
 import os
 from google.adk.tools.tool_context import ToolContext
-from .adk_common.utils.utils_logging import Severity, log_message
-from .adk_common.utils.utils_agents import SESSION_ARTIFACTS_STATE_KEY
-from .state import (
+from ..adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_agents import SESSION_ARTIFACTS_STATE_KEY
+from ..state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     PRODUCT_IMAGE_URI_STATE_KEY,
     LOGO_IMAGE_URI_STATE_KEY,
@@ -30,7 +30,7 @@ from .state import (
     ASSET_REGISTRY_STATE_KEY,
     UPLOAD_COUNTER_STATE_KEY,
 )
-from .utils_gcs import set_output_folder
+from ..utils.utils_gcs import set_output_folder
 
 def select_brand_preset(tool_context: ToolContext, preset_name: str):
     """Loads official brand guidelines, logos, card mockups, and compliance
@@ -173,7 +173,7 @@ async def run_production_test(tool_context: ToolContext, url: str = "https://www
         url: The URL to research and use as a basis for image generation (for full test).
         asset_uri: Optional. If provided, just generates a signed URL for this specific asset (e.g., gs://... or /samples/...).
     """
-    from .utils_gcs import get_public_url
+    from ..utils.utils_gcs import get_public_url
     
     if asset_uri:
         log_message(f"Generating signed URL for asset: {asset_uri}", Severity.INFO)

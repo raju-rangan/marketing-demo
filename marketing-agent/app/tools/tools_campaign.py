@@ -14,11 +14,11 @@
 
 import json
 from google.adk.tools.tool_context import ToolContext
-from .adk_common.dtos.generated_media import GeneratedMedia
-from .adk_common.utils import utils_agents, utils_gcs, utils_prompts
-from .adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.dtos.generated_media import GeneratedMedia
+from ..adk_common.utils import utils_agents, utils_gcs, utils_prompts
+from ..adk_common.utils.utils_logging import Severity, log_message
 
-from .state import (
+from ..state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     PRODUCT_IMAGE_URI_STATE_KEY,
     LOGO_IMAGE_URI_STATE_KEY,
@@ -31,12 +31,12 @@ from .state import (
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     AGENT_VERSION,
 )
-from .campaign_utils import (
+from ..utils.campaign_utils import (
     Campaign,
     parse_campaigns_from_xml,
 )
-from .generate_campaigns import generate_campaigns_xml
-from .utils_gcs import set_output_folder
+from ..generate_campaigns import generate_campaigns_xml
+from ..utils.utils_gcs import set_output_folder
 
 # Internal cache for campaigns
 _CACHED_CAMPAIGNS_LIST: list[Campaign] | None = None

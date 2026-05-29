@@ -6,12 +6,12 @@ import os
 from typing import List
 
 from google.adk.tools.tool_context import ToolContext
-from .adk_common.dtos.generated_media import GeneratedMedia
-from .adk_common.utils import utils_agents, utils_gcs
-from .adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.dtos.generated_media import GeneratedMedia
+from ..adk_common.utils import utils_agents, utils_gcs
+from ..adk_common.utils.utils_logging import Severity, log_message
 from google import genai
 from google.genai import types
-from .state import (
+from ..state import (
     GOOGLE_CLOUD_PROJECT,
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     PRODUCT_COMPANY_NAME_STATE_KEY,
@@ -22,8 +22,8 @@ from .state import (
     CHOSEN_SLIDE_STYLE_STATE_KEY,
     CHOSEN_VOICEOVER_STYLE_STATE_KEY,
 )
-from .utils_gcs import get_public_url, set_output_folder
-from .schema import SlidecastStoryboard, SlidecastSlide, NanomationPlan, NanomationPhase
+from ..utils.utils_gcs import get_public_url, set_output_folder
+from ..schema import SlidecastStoryboard, SlidecastSlide, NanomationPlan, NanomationPhase
 
 from .tools_media import (
     _generate_gemini_image,
@@ -31,7 +31,7 @@ from .tools_media import (
     _generate_lyria_music,
     _get_brand_wall_directive,
 )
-from .shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
+from ..shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
 from fpdf import FPDF
 import io
 
@@ -613,7 +613,7 @@ async def execute_slide_animation(tool_context: ToolContext, animation_plan: dic
         
     # 3. Stitch the clips together
     log_message(f"Stitching {len(clips)} video segments...", Severity.INFO)
-    from .shared_infra.utils_media import stitch_videos
+    from ..shared_infra.utils_media import stitch_videos
     stitched_video = stitch_videos(clips) if len(clips) > 1 else clips[0]
     
     if not stitched_video:

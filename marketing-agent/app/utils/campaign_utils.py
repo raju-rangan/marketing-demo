@@ -17,7 +17,7 @@
 from typing import Any, Dict, List, Optional
 from xml.etree import ElementTree as ET
 
-from .adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_logging import Severity, log_message
 from pydantic import BaseModel, HttpUrl, ValidationError, field_validator
 
 LOGGING_PREFIX = "[CampaignUtils]"

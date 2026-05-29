@@ -34,10 +34,10 @@ from .state import (
     FREEDOM_CARD_URI,
     PRIVATE_WEALTH_CARD_URI,
 )
-from .utils_gcs import get_public_url
+from .utils.utils_gcs import get_public_url
 
 # Import tools
-from .tools_campaign import (
+from .tools.tools_campaign import (
     setup_product_campaign,
     get_campaign_idea,
     save_selected_campaign,
@@ -45,14 +45,14 @@ from .tools_campaign import (
     set_customer_persona,
     clear_customer_persona,
 )
-from .tools_media import (
+from .tools.tools_media import (
     generate_text_ad,
     generate_display_ad,
     generate_campaign_storyboard,
     generate_video_from_storyboard,
     create_image_composite,
 )
-from .tools_misc import (
+from .tools.tools_misc import (
     select_brand_preset,
     query_internal_knowledge_base,
     process_user_uploads,
@@ -61,7 +61,7 @@ from .tools_misc import (
     run_production_test,
 )
 
-from .tools_slidecast import (
+from .tools.tools_slidecast import (
     research_urls_to_report,
     generate_slidecast_storyboard,
     preview_slidecast_assets,
