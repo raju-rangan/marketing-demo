@@ -35,7 +35,7 @@ from ..utils.campaign_utils import (
     Campaign,
     parse_campaigns_from_xml,
 )
-from ..generate_campaigns import generate_campaigns_xml
+from ..utils.generate_campaigns import generate_campaigns_xml
 from ..utils.utils_gcs import set_output_folder
 
 # Internal cache for campaigns
