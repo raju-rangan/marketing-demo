@@ -250,7 +250,7 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             log_message(f"Audio mixing failed: {e}", Severity.ERROR)
             return video_bytes
 
-def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.4) -> bytes:
+def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.1) -> bytes:
     """Overlays a logo in the bottom-right corner of the video."""
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")
@@ -402,7 +402,7 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
 def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0) -> bytes | None:
     """
     Compiles a slidecast video using ffmpeg with hard cuts (fast).
-    `slides` is a list of dicts: {"image_bytes": bytes, "audio_bytes": bytes, "text_overlay": str}
+    `slides` is a list of dicts: {"image_bytes": bytes, "video_bytes": Optional[bytes], "audio_bytes": bytes, "text_overlay": str}
     """
     if not slides:
         return None
@@ -413,9 +413,9 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
         
         for i, slide in enumerate(slides):
             img_path = os.path.join(tmpdir, f"img_{i}.png")
+            vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
             
-            with open(img_path, "wb") as f: f.write(slide["image_bytes"])
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
             
             dur = get_video_duration(aud_path)
@@ -423,16 +423,29 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
                 log_message(f"Failed to get audio duration for slide {i}, defaulting to 5.0s", Severity.WARNING)
                 dur = 5.0
             
-            # Use simple loop with exact duration
-            inputs.extend(["-loop", "1", "-t", str(dur), "-i", img_path])
+            # Use video if provided, else image
+            is_video = False
+            if slide.get("video_bytes"):
+                with open(vid_path, "wb") as f: f.write(slide["video_bytes"])
+                # Play video once, we'll hold the last frame with tpad
+                inputs.extend(["-i", vid_path])
+                is_video = True
+            else:
+                with open(img_path, "wb") as f: f.write(slide["image_bytes"])
+                inputs.extend(["-loop", "1", "-t", str(dur), "-i", img_path])
+                
             inputs.extend(["-i", aud_path])
             
             v_idx = i * 2
             a_idx = i * 2 + 1
             text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
             
-            # Simple scale and pad, no zoom
-            v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,"
+            # Scale, pad, and trim the video stream to exactly match the audio duration
+            if is_video:
+                # Use tpad to hold the last frame indefinitely, then trim to exact audio duration
+                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,tpad=stop=-1:stop_mode=clone,trim=duration={dur},setpts=PTS-STARTPTS,"
+            else:
+                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,trim=duration={dur},setpts=PTS-STARTPTS,"
             if text:
                 v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
             
