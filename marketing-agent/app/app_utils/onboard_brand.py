@@ -15,13 +15,8 @@ def create_dummy_image(filepath):
         with open(filepath, "wb") as f:
             f.write(base64.b64decode(DUMMY_PNG_B64))
 
-def onboard_brand(brand_name, url=None):
-    print(f"🚀 Onboarding brand: {brand_name}")
-    if url:
-        print(f"🔍 Researching brand at: {url}")
-    
-    # Setup directories
-    brand_id = brand_name.lower().replace(" ", "_")
+def setup_brand_directories(brand_id):
+    """Sets up the necessary directories and dummy assets for a brand."""
     brand_dir = os.path.join("app", "brands", brand_id)
     assets_dir = os.path.join(brand_dir, "assets")
     
@@ -36,7 +31,10 @@ def onboard_brand(brand_name, url=None):
     
     print(f"📁 Created asset directory: {assets_dir}")
     print("   ↳ Generated dummy logo.png and product_image.png")
-    
+    return brand_dir, assets_dir
+
+def generate_brand_artifacts(brand_name, brand_id, brand_dir, assets_dir, url=None):
+    """Researches the brand using Gemini and generates config, presets, and prompt.md."""
     project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
     
@@ -126,27 +124,8 @@ def onboard_brand(brand_name, url=None):
         with open(presets_path, "w") as f:
             json.dump(presets_data, f, indent=2)
             
-        # Generate prompt.md from template
-        template_path = os.path.join("app", "prompt.template.md")
-        prompt_out_path = os.path.join(brand_dir, "prompt.md")
-        if os.path.exists(template_path):
-            with open(template_path, "r") as f:
-                prompt_text = f.read()
-            
-            config_obj = raw_data.get("config", raw_data)
-            placeholders = [
-                "BRAND_NAME", "BRAND_PERSONA_DESCRIPTION", "COMPLIANCE_GUIDELINES",
-                "BRAND_VAULT_TABLE", "EXCLUSION_RULES", "BRAND_WALL_RULES", "DEFAULT_BRAND_PRESET"
-            ]
-            for p in placeholders:
-                val = config_obj.get(p.lower(), f"MISSING_{p}")
-                prompt_text = prompt_text.replace(f"{{{{{p}}}}}", str(val))
-                
-            with open(prompt_out_path, "w") as f:
-                f.write(prompt_text)
-            print(f"✅ Brand prompt saved to: {prompt_out_path}")
-        else:
-            print(f"⚠️ Could not find {template_path} to generate prompt.md")
+        config_obj = raw_data.get("config", raw_data)
+        generate_brand_prompt(brand_dir, config_obj)
         
         print(f"✅ Brand configuration saved to: {config_path}")
         print(f"✅ Default preset saved to: {presets_path}")
@@ -158,6 +137,47 @@ def onboard_brand(brand_name, url=None):
     except Exception as e:
         print(f"❌ ERROR: Failed to onboard brand: {e}")
         sys.exit(1)
+
+def generate_brand_prompt(brand_dir, config_obj):
+    """Generates prompt.md from the template and brand config."""
+    # Adjust path assuming this runs from the marketing-agent directory
+    template_path = os.path.join("app", "prompt.template.md")
+    
+    # If the script is run from a different directory (like the test script), try to find it
+    if not os.path.exists(template_path):
+         # Try looking one level up or down based on typical structures, or use absolute paths if needed
+         # For our test script, we might be in the root dir.
+         alt_path = os.path.join("marketing-agent", "app", "prompt.template.md")
+         if os.path.exists(alt_path):
+             template_path = alt_path
+
+    prompt_out_path = os.path.join(brand_dir, "prompt.md")
+    if os.path.exists(template_path):
+        with open(template_path, "r") as f:
+            prompt_text = f.read()
+        
+        placeholders = [
+            "BRAND_NAME", "BRAND_PERSONA_DESCRIPTION", "COMPLIANCE_GUIDELINES",
+            "BRAND_VAULT_TABLE", "EXCLUSION_RULES", "BRAND_WALL_RULES", "DEFAULT_BRAND_PRESET"
+        ]
+        for p in placeholders:
+            val = config_obj.get(p.lower(), f"MISSING_{p}")
+            prompt_text = prompt_text.replace(f"{{{{{p}}}}}", str(val))
+            
+        with open(prompt_out_path, "w") as f:
+            f.write(prompt_text)
+        print(f"✅ Brand prompt saved to: {prompt_out_path}")
+    else:
+        print(f"⚠️ Could not find {template_path} to generate prompt.md")
+
+def onboard_brand(brand_name, url=None):
+    print(f"🚀 Onboarding brand: {brand_name}")
+    if url:
+        print(f"🔍 Researching brand at: {url}")
+    
+    brand_id = brand_name.lower().replace(" ", "_")
+    brand_dir, assets_dir = setup_brand_directories(brand_id)
+    generate_brand_artifacts(brand_name, brand_id, brand_dir, assets_dir, url)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

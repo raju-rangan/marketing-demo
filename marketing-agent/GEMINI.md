@@ -1,3 +1,4 @@
+
 # Coding Agent Guide
 
 ## Reference Documentation
@@ -16,7 +17,8 @@ Otherwise, fetch these resources as needed:
 ## Development Phases
 
 ### Phase 1: Understand Requirements
-Before writing any code, understand the project's requirements, constraints, and success criteria.
+Before writing any code, understand the project's requirements, constraints, and success criteria. ALWAYS ALWAYS ALWAYS state what you are going to do very succintly before generating any code. 
+
 
 ### Phase 2: Build and Implement
 Implement agent logic in `app/`. Use `make playground` for interactive testing. Iterate based on user feedback.
