@@ -68,6 +68,14 @@ def create_bucket_from_spec(bucket_name: str, bucket_location: str, project: str
             # Calculate retention in seconds
             retention_seconds = DEPLOYMENT_BUCKET_SOFT_DELETE_DAYS * 24 * 60 * 60
             bucket_resource.soft_delete_policy.retention_duration_seconds = retention_seconds
+        
+        # Add 7-day Lifecycle Rule (TTL) - Automatically delete objects after 7 days
+        bucket_resource.lifecycle_rules = [
+            {
+                "action": {"type": "Delete"},
+                "condition": {"age": 7}
+            }
+        ]
 
         # 2. Try to create the bucket using the resource object
         print(f"Attempting to create bucket '{bucket_name}' in {bucket_location}...")
@@ -79,8 +87,15 @@ def create_bucket_from_spec(bucket_name: str, bucket_location: str, project: str
 
     except exceptions.Conflict:
         # The 409 Conflict exception means the bucket already exists.
-        log_message(f"Bucket '{bucket_name}' already exists. Fetching.", Severity.INFO)
+        log_message(f"Bucket '{bucket_name}' already exists. Updating lifecycle rules.", Severity.INFO)
         bucket = client.get_bucket(bucket_name)
+        bucket.lifecycle_rules = [
+            {
+                "action": {"type": "Delete"},
+                "condition": {"age": 7}
+            }
+        ]
+        bucket.patch()
 
     except Exception as e:
         log_message(f"An unexpected error occurred: {e}", Severity.ERROR)

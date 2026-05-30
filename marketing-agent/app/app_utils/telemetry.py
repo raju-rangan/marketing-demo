@@ -23,24 +23,11 @@ from opentelemetry.instrumentation.google_genai import GoogleGenAiSdkInstrumento
 
 def setup_telemetry() -> str | None:
     """Configure OpenTelemetry and GenAI telemetry with Cloud Trace and GCS upload."""
-    os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "true")
+    os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "false")
 
-    # 1. OpenTelemetry Tracing Setup (Cloud Trace)
-    try:
-        # Use a project ID from environment or default
-        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
-        
-        provider = TracerProvider()
-        exporter = CloudTraceSpanExporter(project_id=project_id)
-        processor = BatchSpanProcessor(exporter)
-        provider.add_span_processor(processor)
-        trace.set_tracer_provider(provider)
-        
-        # Instrument the Google GenAI SDK
-        GoogleGenAiSdkInstrumentor().instrument()
-        logging.info("OpenTelemetry Tracing initialized with Cloud Trace exporter.")
-    except Exception as e:
-        logging.warning(f"Could not initialize OpenTelemetry/CloudTrace: {e}")
+    # 1. OpenTelemetry Tracing Setup (Cloud Trace) - DISABLED
+    # Cloud Trace discovery often triggers 403 Permission Denied on Cloud Resource Manager API.
+    logging.info("OpenTelemetry Tracing is currently DISABLED to prevent discovery errors.")
 
     # 2. GCS Upload Telemetry (Legacy / Sidecar logging)
     bucket = os.environ.get("LOGS_BUCKET_NAME") or os.environ.get("GOOGLE_CLOUD_BUCKET_ARTIFACTS")

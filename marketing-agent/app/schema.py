@@ -233,3 +233,33 @@ class Brand(BaseModel):
     voice_and_tone: VoiceAndTone
     social_media_model: Optional[SocialAIModel] = None
 
+
+class SlidecastSlide(BaseModel):
+    image_prompt: str
+    script: str
+    text_overlay: Optional[str] = None
+    image_url: Optional[str] = None
+    audio_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class SlidecastStoryboard(BaseModel):
+    title: str
+    slides: List[SlidecastSlide]
+    music_prompt: Optional[str] = "Cinematic and educational background music"
+    video_url: Optional[str] = None
+
+class NanomationPhase(BaseModel):
+    description: str
+    image_prompt: str
+    motion_prompt: Optional[str] = "Cinematic smooth motion"
+    duration_seconds: Optional[int] = 4
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class NanomationPlan(BaseModel):
+    target: str
+    progression_type: str = "linear"
+    phases: List[NanomationPhase]
+    topic: str
+
+

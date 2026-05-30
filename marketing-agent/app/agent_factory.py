@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import json
 from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -29,34 +30,41 @@ from .state import (
     REFERENCE_GUIDELINES_STATE_KEY,
     ASSET_REGISTRY_STATE_KEY,
     DEMO_COMPANY_NAME,
-    JPMC_LOGO_URI,
-    SAPPHIRE_CARD_URI,
-    FREEDOM_CARD_URI,
-    PRIVATE_WEALTH_CARD_URI,
 )
-from .utils_gcs import get_public_url
+from .utils.utils_gcs import get_public_url
 
 # Import tools
-from .tools_campaign import (
+from .tools.tools_campaign import (
     setup_product_campaign,
     get_campaign_idea,
     save_selected_campaign,
     get_selected_brief,
-    set_customer_persona,
-    clear_customer_persona,
 )
-from .tools_media import (
+from .tools.tools_media import (
     generate_text_ad,
     generate_display_ad,
     generate_campaign_storyboard,
     generate_video_from_storyboard,
+    create_image_composite,
 )
-from .tools_misc import (
+from .tools.tools_misc import (
     select_brand_preset,
     query_internal_knowledge_base,
     process_user_uploads,
     rename_asset_tag,
     deploy_react_website,
+    run_production_test,
+)
+
+from .tools.tools_slidecast import (
+    research_urls_to_report,
+    generate_slidecast_storyboard,
+    update_slidecast_slide,
+    preview_slidecast_assets,
+    finalize_slidecast_video,
+    select_slidecast_style,
+    generate_slide_animation_plan,
+    execute_slide_animation,
 )
 
 # Import sub-agents
@@ -67,10 +75,25 @@ from .sub_agents.trend_spotter import TrendSpotter
 # ============================================================
 
 def _dynamic_instruction_provider(context: ReadonlyContext) -> str:
-    prompt_path = os.path.join(os.path.dirname(__file__), "prompt.md")
-    with open(prompt_path, "r") as f:
-        prompt_template = f.read()
+    # 1. Determine active brand
+    active_brand = os.environ.get("ACTIVE_BRAND", "goog")
+    brand_dir = os.path.join(os.path.dirname(__file__), "brands", active_brand)
 
+    # 2. Load the brand's specific prompt.md
+    prompt_path = os.path.join(brand_dir, "prompt.md")
+    
+    # Fallback to the goog prompt if the active brand's prompt is missing
+    if not os.path.exists(prompt_path):
+        prompt_path = os.path.join(os.path.dirname(__file__), "brands", "goog", "prompt.md")
+    
+    try:
+        with open(prompt_path, "r") as f:
+            prompt = f.read()
+    except FileNotFoundError:
+        # Failsafe if goog/prompt.md isn't generated yet (e.g. during tests)
+        prompt = "You are the Marketing Agent. (prompt.md missing)"
+
+    # 3. Fill dynamic session state variables (These change during the conversation)
     company_name = context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, DEMO_COMPANY_NAME)
     selected_campaign = context.state.get(CHOSEN_CAMPAIGN_IDEA_STATE_KEY, "Not selected yet")
     selected_asset_sheet = context.state.get(CHOSEN_ASSET_SHEET_ID_STATE_KEY, "Not selected yet")
@@ -83,19 +106,23 @@ def _dynamic_instruction_provider(context: ReadonlyContext) -> str:
     registry = context.state.get(ASSET_REGISTRY_STATE_KEY, {})
     registry_summary = "\n".join([f"- {tag}: {os.path.basename(uri)}" for tag, uri in registry.items()]) if registry else "Empty"
 
-    prompt = prompt_template.replace("{{AGENT_NAME}}", "JPMCAgent")
+    # Note: The template variables below still exist in the generated prompt files
+    # to allow the agent to reflect the current state back to the user.
     prompt = prompt.replace("{{DEMO_COMPANY_NAME}}", str(company_name))
     prompt = prompt.replace("{{SELECTED_CAMPAIGN_NAME}}", str(selected_campaign))
     prompt = prompt.replace("{{SELECTED_ASSET_SHEET_URI}}", str(selected_asset_sheet))
     prompt = prompt.replace("{{PRODUCT_SETUP_DONE}}", str(product_setup_done))
     prompt = prompt.replace("{{REFERENCE_GUIDELINES_STATUS}}", has_guidelines)
     prompt = prompt.replace("{{ASSET_REGISTRY_SUMMARY}}", registry_summary)
+        
+    # 4. Generic Environment Variable Resolver
+    # Replaces any remaining {{ENV_VAR}} with its value from os.environ
+    import re
+    def replace_env_var(match):
+        env_var_name = match.group(1)
+        return os.environ.get(env_var_name, f"MISSING_ENV_{env_var_name}")
     
-    # Inject JPMC brand assets
-    prompt = prompt.replace("{{JPMC_LOGO_URI}}", get_public_url(JPMC_LOGO_URI) if JPMC_LOGO_URI else "")
-    prompt = prompt.replace("{{SAPPHIRE_CARD_URI}}", get_public_url(SAPPHIRE_CARD_URI) if SAPPHIRE_CARD_URI else "")
-    prompt = prompt.replace("{{FREEDOM_CARD_URI}}", get_public_url(FREEDOM_CARD_URI) if FREEDOM_CARD_URI else "")
-    prompt = prompt.replace("{{PRIVATE_WEALTH_CARD_URI}}", get_public_url(PRIVATE_WEALTH_CARD_URI) if PRIVATE_WEALTH_CARD_URI else "")
+    prompt = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replace_env_var, prompt)
     
     return prompt
 
@@ -109,12 +136,9 @@ marketing_skills = SkillToolset(
     skills=[
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "ad-copywriting")),
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "video-storytelling")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "visual-direction")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "brand-strategy")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "trend-analysis")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "platform-specs")),
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "financial-marketing")),
         load_skill_from_dir(os.path.join(_SKILLS_DIR, "website-design")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "slide-design")),
     ],
 )
 
@@ -128,15 +152,13 @@ root_agent = Agent(
     name="marketing_agent",
     model=Gemini(model="gemini-3-flash-preview"),
     instruction=_dynamic_instruction_provider,
-    description="Combined JPMC Marketing Campaign Agent. Handles ideation, creative direction, and media generation.",
+    description="Generic Marketing Campaign Agent. Handles ideation, creative direction, and media generation.",
     tools=[
         marketing_skills,
         setup_product_campaign,
         get_campaign_idea,
         save_selected_campaign,
         get_selected_brief,
-        set_customer_persona,
-        clear_customer_persona,
         generate_text_ad,
         generate_display_ad,
         generate_campaign_storyboard,
@@ -146,6 +168,17 @@ root_agent = Agent(
         process_user_uploads,
         rename_asset_tag,
         deploy_react_website,
+        research_urls_to_report,
+        generate_slidecast_storyboard,
+        update_slidecast_slide,
+        preview_slidecast_assets,
+        finalize_slidecast_video,
+        select_slidecast_style,
+        generate_slide_animation_plan,
+        execute_slide_animation,
+        create_image_composite,
+        run_production_test,
+        get_public_url,
         AgentTool(agent=trend_spotter_agent.agent),
     ],
 )

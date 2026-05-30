@@ -17,7 +17,7 @@
         },
         {
           "rubricId": "brand_purity",
-          "rubricContent": { "textProperty": "The response strictly adheres to brand silos. If the product is 'Chase', it must NOT mention 'J.P. Morgan' or 'JPMC'. If the product is 'J.P. Morgan', it must NOT mention 'Chase'." }
+          "rubricContent": { "textProperty": "The response strictly adheres to the active brand's identity and silos. It must NOT mention competitors or use assets/styles from outside the provided brand vault." }
         },
         {
           "rubricId": "narrative_flow",

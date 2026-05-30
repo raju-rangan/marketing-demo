@@ -26,7 +26,7 @@ Connect the product to an emotion, identity, or aspiration rather than features.
 ### 4. High-End Financial & Membership Brands (Elite Identity)
 Position on exclusive access, global travel privilege tiers, secure advisory, and premium experiential lifestyle perks.
 - "Your passport to the extraordinary." or "Curated for those who seek more."
-- Best for: elite credit cards (e.g. Chase Sapphire Reserve), private wealth management, premium loyalty services.
+- Best for: elite credit cards, private wealth management, premium loyalty services.
 
 ### 5. Problem-Solution
 Lead with a pain point the audience recognizes, then present the product as the answer.

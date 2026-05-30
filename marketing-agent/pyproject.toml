@@ -29,6 +29,8 @@ dependencies = [
     "lxml>=5.0.0",
     "httpx>=0.27.0",
     "tenacity>=8.0.0",
+    "fpdf2>=2.7.0",
+    "graphifyy"
 ]
 requires-python = ">=3.10,<3.14"
 

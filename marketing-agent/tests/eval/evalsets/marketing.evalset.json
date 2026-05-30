@@ -1,0 +1,81 @@
+{
+  "eval_set_id": "goog_marketing_workflow_eval",
+  "name": "GOOG Marketing Workflow Evaluation",
+  "description": "Comprehensive evaluation of the Marketing Assistant's ability to ideate, storyboard, and produce cinematic campaigns for GOOG products.",
+  "eval_cases": [
+    {
+      "eval_id": "autopilot_search_ai",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Autopilot: Pitch me a campaign for Google Search & AI Services focused on students"}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "brand_integrity_goog",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "I want to launch a campaign for Google Search. Give me some ideas."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "storyboard_generation_goog",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "Generate a 24-second cinematic storyboard for a Google Search campaign focused on everyday helpfulness."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {
+           "PRODUCT_COMPANY_NAME": "GOOG",
+           "PRODUCT_NAME": "Google Search"
+        }
+      }
+    },
+    {
+      "eval_id": "video_production_request_goog",
+      "conversation": [
+        {
+          "user_content": {
+            "parts": [{"text": "The storyboard looks great. Please produce the final 32-second VEO commercial with voiceover and captions."}]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {
+          "STORYLINE_DATA": {
+            "storyline": "The information you need, right when you need it. Google Search: organizing the world's information for you.",
+            "acts": [
+              {"act_number": 1, "scene_description": "Student studying in cafe", "voiceover": "The information you need, right when you need it."},
+              {"act_number": 2, "scene_description": "Clean search interface reveal", "voiceover": "Google Search: organizing the world's information for you."}
+            ]
+          },
+          "STORYBOARD_KEYFRAMES": ["gs://bucket/goog_f1.png", "gs://bucket/goog_f2.png"],
+          "PRODUCT_COMPANY_NAME": "GOOG",
+          "PRODUCT_NAME": "Google Search"
+        }
+      }
+    }
+  ]
+}
