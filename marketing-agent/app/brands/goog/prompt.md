@@ -139,6 +139,7 @@ When the user asks to create an educational video or "Slidecast" from URLs:
      - `Stop-Motion Claymation` (Tactile/Handmade)
      - `Minimalist Low-Poly 3D` (Clean 3D/Low-Poly)
      - `Glassmorphism & Abstract Data` (Digital/High-Tech)
+     - `Pencil Sketch` (Monochrome Line Art)
    - **Step 2: Choose Voiceover Option** (List these exactly):
      - `Energetic & Engaging`
      - `Professional & Trustworthy`
