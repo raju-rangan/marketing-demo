@@ -48,7 +48,7 @@ Shallow DOF (f/1.4-2.8 look) for lifestyle shots. Deep DOF for studio/product de
 - **Green**: Nature, health, growth (organic, wellness, sustainability)
 - **Gold/Amber**: Premium, luxury, warmth (spirits, jewelry, automotive)
 - **Black + White**: Sophistication, elegance, timelessness (luxury, fashion)
-- **Elite Finance (Sapphire Blue + Platinum + Gold)**: Extreme prestige, worldly access, corporate legacy, and security (e.g. Chase Sapphire Reserve standard).
+- **Elite Finance**: Extreme prestige, worldly access, corporate legacy, and security.
 
 ### Color Harmony
 - **Complementary**: High contrast, attention-grabbing (blue/orange, red/green)

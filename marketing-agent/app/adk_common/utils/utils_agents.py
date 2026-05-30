@@ -344,7 +344,22 @@ async def load_resource(
 
     image_bytes = None
 
-    # Try loading as artifact first
+    # 1. Try loading from local filesystem first (for brand assets shipped with code)
+    if os.path.exists(source_path) and os.path.isfile(source_path):
+        try:
+            log_message(f"Loading resource from local filesystem: {source_path}", Severity.INFO)
+            with open(source_path, "rb") as f:
+                image_bytes = f.read()
+            if image_bytes:
+                return GeneratedMedia(
+                    media_bytes=image_bytes,
+                    mime_type=mime_type,
+                    filename=identifier
+                )
+        except Exception as e:
+            log_message(f"Failed to read local file {source_path}: {e}", Severity.WARNING)
+
+    # 2. Try loading as artifact next
     log_message(f"Attempting to load as artifact: {artifact_name}", Severity.DEBUG)
     artifact: Optional[types.Part] = await tool_context.load_artifact(artifact_name)
     if artifact:
@@ -363,8 +378,8 @@ async def load_resource(
                  filename=artifact_name
             )
 
-    # 2. If not found, try GCS
-    log_message(f"Artifact not found or empty. Attempting to load from GCS: {source_path}", Severity.WARNING)
+    # 3. If not found, try GCS
+    log_message(f"Artifact/Local not found or empty. Attempting to load from GCS: {source_path}", Severity.WARNING)
 
     gcs_candidates = []
 

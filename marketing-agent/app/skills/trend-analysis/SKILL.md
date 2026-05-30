@@ -48,7 +48,7 @@ Rate each trend-product alignment on:
 3. **Audience Overlap** (1-5): Does the trend's audience match the product's target?
 4. **Visual Potential** (1-5): Can this trend create compelling visual content?
 5. **Differentiation** (1-5): Are competitors already using this trend?
-6. **Compliance & Brand Safety** (1-5): Ensure the trend does not carry legal liability, deceptive claims, or regulatory concerns for banking institutions (Must score 5/5 for highly regulated brands like Chase).
+6. **Compliance & Brand Safety** (1-5): Ensure the trend does not carry legal liability, deceptive claims, or regulatory concerns for the specific brand industry (Must score 5/5 for highly regulated brands).
 
 **Score > 24**: Best match — build the campaign around this trend
 **Score 18-24**: Strong match — use as a supporting angle

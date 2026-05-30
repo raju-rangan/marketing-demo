@@ -28,7 +28,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from ..adk_common.dtos.generated_media import GeneratedMedia
 from ..adk_common.utils import ad_generation_constants, utils_agents, utils_gcs, utils_prompts
 from ..adk_common.utils.gemini_utils import generate_and_select_best_image
-from ..adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
 from google import genai
 from google.genai import types
 
@@ -136,27 +136,21 @@ _VARIATION_STYLES = [
 # Helper Functions
 # ============================================================
 
-def _get_brand_wall_directive(company_name: str) -> str:
-    """Returns strict exclusionary rules to prevent brand bleeding."""
-    if "chase" in company_name.lower():
-        return (
-            "\n\n**STRICT BRAND WALL — MANDATORY**:\n"
-            "- You are representing 'Chase'.\n"
-            "- DO NOT mention 'J.P. Morgan', 'JPMorgan', 'JPMC', or the parent company name anywhere.\n"
-            "- Use ONLY the Chase blue/white color palette and logo provided.\n"
-            "- This is a retail consumer brand. Keep it approachable yet premium.\n"
-        )
-    elif "j.p. morgan" in company_name.lower() or "jp morgan" in company_name.lower():
-        return (
-            "\n\n**STRICT BRAND WALL — MANDATORY**:\n"
-            "- You are representing 'J.P. Morgan'.\n"
-            "- DO NOT mention 'Chase' anywhere. This is NOT a retail product.\n"
-            "- Use ONLY the J.P. Morgan navy/gold color palette and logo provided.\n"
-            "- This is an elite wealth management brand. Aesthetic must be 'Quiet Luxury'.\n"
-        )
-    return ""
+def _get_brand_wall_directive(company_name: str, guidelines: str = "") -> str:
+    """Returns strict exclusionary rules and visual requirements for media models."""
+    directive = f"\n\n**BRAND MANDATE: {company_name.upper()}**:\n"
+    directive += f"- You represent '{company_name}'. DO NOT mention competitors or parent brands.\n"
+    
+    if guidelines:
+        # We limit to 1000 to prevent VEO prompt truncation (2000 char total limit)
+        directive += f"- Adhere to these brand visual rules: {guidelines[:1000]}\n"
+    
+    return directive
 
 async def _retry_generate_content(model, contents, config, label="LLM", max_attempts=4):
+    # 🔁 High-visibility logging for Content Generation
+    if isinstance(contents, str):
+        log_message(f"🤖 [GEN CONTENT PROMPT - {label}]: {contents[:1000]}...", Severity.INFO)
     """Shared retry wrapper for all Gemini generate_content calls."""
     for attempt in range(max_attempts):
         try:
@@ -172,8 +166,21 @@ async def _retry_generate_content(model, contents, config, label="LLM", max_atte
             else:
                 raise
 
+def _get_image_mime_type(data: bytes) -> str:
+    """Detects image mime type from bytes."""
+    if data.startswith(b'\x89PNG'): return "image/png"
+    if data.startswith(b'\xff\xd8'): return "image/jpeg"
+    if data.startswith(b'RIFF') and data[8:12] == b'WEBP': return "image/webp"
+    return "image/png"
+
 async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image", aspect_ratio: str = None) -> bytes | None:
-    parts = [types.Part.from_bytes(data=img, mime_type="image/png") for img in reference_images]
+    # 📸 High-visibility logging for Image Generation
+    log_message(f"🖼️ [`IMAGE GEN ARGS]` Label: {label} | Aspect Ratio: {aspect_ratio}", Severity.INFO)
+    log_message(f"📝 [IMAGE GEN PROMPT]: {prompt}", Severity.INFO)
+    
+    log_message(f"📎 [IMAGE GEN REFS]: {len(reference_images)} images attached", Severity.INFO)
+
+    parts = [types.Part.from_bytes(data=img, mime_type=_get_image_mime_type(img)) for img in reference_images if img]
     parts.append(types.Part.from_text(text=prompt))
 
     contents = [types.Content(role="user", parts=parts)]
@@ -222,6 +229,13 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
                                      clip_duration: int = 6, end_frame_gcs_uri: str | None = None,
                                      label: str = "clip") -> bytes | None:
     """Generates a single VEO video clip using the source's operation polling pipeline."""
+    # 🎬 High-visibility logging for Video Generation
+    log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s", Severity.INFO)
+    log_message(f"📝 [VEO GEN PROMPT]: {prompt}", Severity.INFO)
+    log_message(f"🖼️ [VEO GEN START FRAME]: {start_frame_gcs_uri}", Severity.INFO)
+    if end_frame_gcs_uri:
+        log_message(f"🏁 [VEO GEN END FRAME]: {end_frame_gcs_uri}", Severity.INFO)
+
     mode = "interpolation" if end_frame_gcs_uri else "i2v"
     try:
         img_mime = "image/png"
@@ -283,11 +297,14 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
         log_message(f"VEO {label} exception: {e}", Severity.ERROR)
         return None
 
+
 # ============================================================
 # Audio Generation Helpers
 # ============================================================
 
 async def _generate_lyria_music(lyria_prompt: str, product_name: str) -> bytes | None:
+    # 🎵 High-visibility logging for Music Generation
+    log_message(f"🎼 [LYRIA GEN PROMPT]: {lyria_prompt}", Severity.INFO)
     """Generates instrumental background music using Lyria."""
     try:
         if not lyria_prompt or len(lyria_prompt) < 20:
@@ -320,10 +337,11 @@ async def _generate_lyria_music(lyria_prompt: str, product_name: str) -> bytes |
         return None
 
 async def _generate_voiceover_audio(script: str, voice_name: str = None) -> bytes | None:
-    """Generates voiceover audio using Gemini 3.1 Flash TTS Preview."""
+    # 🎙️ High-visibility logging for Voiceover Generation
+    log_message(f"🗣️ [TTS GEN SCRIPT]: {script[:500]}...", Severity.INFO)
     import io
     import wave
-    
+
     def _pcm_to_wav(pcm_data: bytes, channels=1, rate=24000, sample_width=2) -> bytes:
         with io.BytesIO() as wav_io:
             with wave.open(wav_io, "wb") as wf:
@@ -431,9 +449,9 @@ async def _generate_storyline(company_name: str, product_name: str, rationale: s
     ACTS = max(1, duration_seconds // CLIP_SEC)
     words_per_act = 25
 
-    guidelines_context = f"\n\nReference Guidelines: {reference_guidelines[:1000]}" if reference_guidelines else ""
+    guidelines_context = f"\n\nReference Guidelines: {reference_guidelines[:2000]}" if reference_guidelines else ""
     persona_context = f"\n\nTARGET PERSONA: {customer_persona}" if customer_persona else ""
-    brand_wall = _get_brand_wall_directive(company_name)
+    brand_wall = _get_brand_wall_directive(company_name, guidelines=tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, ""))
     
     prompt = (
         f"You are a LIFESTYLE DOCUMENTARY DIRECTOR. Your specialty is capturing the pure joy of human moments.\n\n"
@@ -475,13 +493,14 @@ async def _generate_storyline(company_name: str, product_name: str, rationale: s
             "lyria_prompt": ""
         }
 
+@stream_status("🎬 Directing the storyboard acts...")
 async def generate_campaign_storyboard(
     tool_context: ToolContext, segment_name: str, selected_campaign_name: str, duration_seconds: int = 24
 ):
     """Generates a multi-frame storyboard following a Human-First documentary pipeline."""
     set_output_folder(tool_context)
     product_image_uri = tool_context.state.get(PRODUCT_IMAGE_URI_STATE_KEY)
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
     product_name = tool_context.state.get("PRODUCT_NAME", "product")
     ref_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     persona = tool_context.state.get(CUSTOMER_PERSONA_STATE_KEY, "")
@@ -534,7 +553,7 @@ async def generate_campaign_storyboard(
             kf_descriptions.append(acts[-1].get("end_scene_description", "Final emotional payoff"))
 
     refs = [product_bytes] + ([logo_bytes] if logo_bytes else [])
-    brand_wall = _get_brand_wall_directive(company_name)
+    brand_wall = _get_brand_wall_directive(company_name, guidelines=tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, ""))
     
     compliance = (
         f"\n\n**VIDEO PRODUCTION DIRECTIVE — HUMAN-FIRST**:\n"
@@ -603,7 +622,7 @@ async def _create_display_ad_task(
     variation_index: int = 0,
     filename_prefix: str = "ad"
 ) -> Dict[str, Any]:
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "JPMC")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
     product_name = tool_context.state.get("PRODUCT_NAME", "Product")
     ref_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     persona = tool_context.state.get(CUSTOMER_PERSONA_STATE_KEY, "")
@@ -612,9 +631,11 @@ async def _create_display_ad_task(
     reference_parts.append(types.Part.from_bytes(data=product_bytes, mime_type="image/png"))
     if asset_sheet_bytes:
         reference_parts.append(types.Part.from_bytes(data=asset_sheet_bytes, mime_type="image/png"))
+    if logo_bytes:
+        reference_parts.append(types.Part.from_bytes(data=logo_bytes, mime_type="image/png"))
 
     style_rule = _VARIATION_STYLES[variation_index % len(_VARIATION_STYLES)]
-    brand_wall = _get_brand_wall_directive(company_name)
+    brand_wall = _get_brand_wall_directive(company_name, guidelines=tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, ""))
 
     # Source Prompt Block
     final_prompt = (
@@ -694,6 +715,7 @@ async def generate_display_ad(
 # Video Production Pipeline (DIRECT SOURCE PORT)
 # ============================================================
 
+@stream_status("🎥 Rendering the final cinematic VEO commercial...")
 async def generate_video_from_storyboard(
     tool_context: ToolContext, selected_campaign_name: str, segment_name: str, duration_seconds: int = 24,
     asset_tags: Optional[List[str]] = None, voiceover_script: Optional[str] = None
@@ -734,6 +756,7 @@ async def generate_video_from_storyboard(
         except Exception: pass
 
     # Start audio tasks in parallel
+    log_status("🔊 Generating high-fidelity voiceover and background music...")
     vo_task = asyncio.create_task(_generate_voiceover_audio(final_voiceover_script))
     lyria_task = asyncio.create_task(_generate_lyria_music(lyria_prompt, product_name))
 
@@ -744,6 +767,7 @@ async def generate_video_from_storyboard(
         full_motion = _sanitize_veo_prompt(f"{motion}. TRANSITION EFFECT: {transition}")
 
         log_message(f"VEO FINAL PROMPT (Act {act_idx+1}):\n{full_motion}", Severity.INFO)
+        log_status(f"🤖 Generating VEO scene {act_idx+1} of {ACTS}...")
 
         start_uri = storyboard_uris[act_idx] if act_idx < len(storyboard_uris) else storyboard_uris[-1]
         end_uri = storyboard_uris[act_idx + 1] if act_idx + 1 < len(storyboard_uris) else None
@@ -762,6 +786,7 @@ async def generate_video_from_storyboard(
     music_bytes = await lyria_task
 
     # Post-production
+    log_status("🎬 Mastering and stitching the final commercial...")
     log_message("Post-production: stitching and mixing...", Severity.INFO)
     stitched = stitch_videos(clips) if len(clips) > 1 else clips[0]
     
@@ -787,4 +812,4 @@ async def generate_video_from_storyboard(
     return {"status": "success", "gcs_url": get_public_url(f"{current_output_folder}/{filename}")}
 
 async def generate_text_ad(tool_context: ToolContext, selected_campaign_name: str, segment_name: str):
-    return {"status": "success", "headlines": ["Chase Your Dreams"], "descriptions": ["Premium rewards with JPMC."]}
+    return {"status": "success", "headlines": ["Unlock Your Potential"], "descriptions": ["Premium rewards await you."]}

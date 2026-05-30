@@ -8,7 +8,7 @@ from typing import List
 from google.adk.tools.tool_context import ToolContext
 from ..adk_common.dtos.generated_media import GeneratedMedia
 from ..adk_common.utils import utils_agents, utils_gcs
-from ..adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
 from google import genai
 from google.genai import types
 from ..state import (
@@ -31,6 +31,7 @@ from .tools_media import (
     _generate_lyria_music,
     _get_brand_wall_directive,
 )
+from .tools_misc import select_brand_preset
 from ..shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
 from fpdf import FPDF
 import io
@@ -46,7 +47,7 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
     # Add Title Page
     pdf.add_page()
     pdf.set_font("helvetica", "B", 24)
-    pdf.set_text_color(0, 74, 153) # Chase Blue
+    pdf.set_text_color(0, 0, 0) # Use brand primary color
     pdf.cell(0, 40, "Slidecast Approval Document", ln=True, align="C")
     pdf.set_font("helvetica", "B", 18)
     pdf.cell(0, 20, title, ln=True, align="C")
@@ -63,7 +64,7 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
             pdf.add_page()
         
         pdf.set_font("helvetica", "B", 14)
-        pdf.set_text_color(0, 74, 153)
+        pdf.set_text_color(0, 0, 0)
         pdf.cell(0, 10, f"Slide {i+1}", ln=True)
         pdf.ln(5)
         
@@ -93,6 +94,7 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
 
     return pdf.output()
 
+@stream_status("🔍 Researching and grounding insights from URLs...")
 def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
     """Researches a list of URLs using Gemini Search Grounding and creates a consolidated insight report."""
     log_message(f"Starting research on {len(urls)} URLs...", Severity.INFO)
@@ -119,13 +121,19 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         log_message(f"Research failed: {e}", Severity.ERROR)
         return f"Error during research: {e}"
 
+@stream_status("📋 Designing the educational storyboard...")
 def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5, language: str = "English") -> dict:
     """Generates a long-form SlidecastStoryboard (JSON) from a research report.
     Enforces a Title Slide for Slide 1 and targets 160 WPM.
     """
+    # Fail-safe: Ensure brand identity is loaded
+    if not tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY):
+        log_message("Brand guidelines missing. Initializing default brand setup...", Severity.INFO)
+        select_brand_preset(tool_context)
+
     log_message(f"Generating branded storyboard for {duration_minutes} min video in {language}...", Severity.INFO)
 
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
@@ -136,6 +144,10 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     
     selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Flat Vector Explainer")
     style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Flat Vector Explainer"])
+
+    branding_directive = f"3. BRANDING: Use {company_name}'s color palette for all designs."
+    if brand_guidelines:
+        branding_directive += f" Follow these strict brand guidelines: {brand_guidelines[:2000]}"
 
     prompt = (
         f"You are an expert Lead Educational Producer for {company_name}.\n"
@@ -156,7 +168,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         f"CORE DIRECTIVES:\n"
         f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
         f"2. NARRATION & GROUNDING: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. The narrative MUST be strictly grounded in the provided Research Report and original articles. Do not include external facts, unverified claims, or information not present in the original research. Do NOT be concise.\n"
-        f"3. BRANDING: Use {company_name}'s color palette (e.g., Chase Blue/White) for all designs.\n"
+        f"3. BRANDING: {branding_directive}\n"
         f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
         f"Research Report:\n{research_report}\n\n"
         f"Output ONLY valid JSON matching this schema:\n"
@@ -225,7 +237,7 @@ def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_in
         next_slide = sb.slides[slide_index + 1]
         context_str += f"\n[NEXT SLIDE - Slide {slide_index + 2}]:\nTitle: {next_slide.slide_title}\nScript: {next_slide.script}\n"
 
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
 
     prompt = (
         f"You are an expert Educational Producer for {company_name}.\n"
@@ -263,6 +275,7 @@ def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_in
         # CRITICAL: Clear URLs so preview/finalize tools know to regenerate these assets
         sb.slides[slide_index].image_url = None
         sb.slides[slide_index].audio_url = None
+        sb.slides[slide_index].video_url = None
         
         return {
             "status": "success",
@@ -273,6 +286,7 @@ def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_in
         log_message(f"Slide update failed: {e}", Severity.ERROR)
         return {"status": "error", "details": str(e)}
 
+@stream_status("🎨 Generating branded slide assets and narration...")
 async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
     """Generates actual images for review and creates an approval PDF.
     Supports partial regeneration by skipping images that already have a valid image_url.
@@ -297,8 +311,22 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
                     raise ValueError(f"Failed to load existing image for slide {idx+1}")
                 return slide, img_res.media_bytes
 
-            # 1. Generate Image (logo-free)
-            img_bytes = await _generate_gemini_image(slide.image_prompt, [], label=f"slide_{idx+1}_image", aspect_ratio="16:9")
+            # 1. Load brand assets
+            logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+            ref_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
+
+            logo_bytes = []
+            if logo_uri:
+                lres = await utils_agents.load_resource(logo_uri, tool_context)
+                if lres:
+                    logo_bytes = [lres.media_bytes]
+
+            # 2. Inject guidelines into prompt
+            styled_prompt = f"{slide.image_prompt}\n\nREFERENCE BRAND RULES:\n{ref_guidelines[:1000]}"
+
+            # 3. Generate Image with logo reference
+            img_bytes = await _generate_gemini_image(styled_prompt, logo_bytes, label=f"slide_{idx+1}_image", aspect_ratio="16:9")
+
             if not img_bytes:
                 log_message(f"Failed to generate image for slide {idx+1}", Severity.ERROR)
                 raise ValueError(f"Failed to generate image for slide {idx+1}")
@@ -357,6 +385,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
         log_message(f"Preview generation failed: {repr(e)}\nTraceback:\n{tb_str}", Severity.ERROR)
         return {"status": "error", "details": str(e)}
 
+@stream_status("🎬 Finalizing the educational slidecast video...")
 async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, animate_slides: bool = False) -> dict:
     """Compiles the approved assets into a final educational video with background music and logo.
     Supports partial regeneration by skipping audio generation if a valid audio_url is present.
@@ -408,11 +437,19 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
 
         # Animate the slide if requested
         video_bytes = None
-        if animate_slides:
+        
+        # 1. Check for cached video clip
+        if slide.video_url:
+            log_message(f"Slide {idx+1} already has a video_url. Skipping Veo generation.", Severity.INFO)
+            vid_res = await utils_agents.load_resource(slide.video_url, tool_context)
+            if vid_res:
+                video_bytes = vid_res.media_bytes
+
+        # 2. Generate animation if missing
+        if not video_bytes and animate_slides:
             log_message(f"Animating slide {idx+1} with Veo...", Severity.INFO)
             # STRICTly constrain Veo to prevent the slide layout/text from panning off screen.
             # Focuses on diverse animations, character actions driven by script, and strict text preservation.
-            script_context = slide.script[:400].replace('\n', ' ').replace('"', "'")
             motion_prompt = (
                 f"A STATIC, LOCKED-OFF CAMERA SHOT. The camera MUST NOT pan, tilt, zoom, or move in any way. "
                 f"The core layout, text, and composition MUST remain completely still and perfectly legible. "
@@ -431,7 +468,15 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                 end_frame_gcs_uri=slide.image_url, 
                 label=f"slide_anim_{idx+1}"
             )
-            if not video_bytes:
+            
+            if video_bytes:
+                # Save new video clip as artifact for future reuse
+                vid_media = GeneratedMedia(filename=f"slide_anim_{idx+1}.mp4", mime_type="video/mp4", media_bytes=video_bytes)
+                saved_vid = await utils_agents.save_to_artifact_and_render_asset(
+                    asset=vid_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
+                )
+                slide.video_url = utils_gcs.normalize_to_gs_bucket_uri(saved_vid.gcs_uri)
+            else:
                 log_message(f"Failed to animate slide {idx+1}. Falling back to static image.", Severity.WARNING)
 
         return {
@@ -457,9 +502,10 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
     logo_bytes = None
     logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
     
-    # Fallback to the provided Chase logo URL
+    # Fallback to the provided logo URL or leave empty
     if not logo_uri:
-        logo_uri = f"gs://{GOOGLE_CLOUD_BUCKET_ARTIFACTS}/samples/chase_logo.png"
+        logo_uri = ""
+
 
     if logo_uri:
         try:
@@ -488,7 +534,12 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
     )
     url = get_public_url(saved_video.gcs_uri)
-    return {"status": "success", "video_url": url, "details": "Slidecast masterclass finalized and ready for viewing."}
+    return {
+        "status": "success", 
+        "video_url": url, 
+        "storyboard": sb.model_dump(),
+        "details": "Slidecast masterclass finalized and ready for viewing."
+    }
 
 def select_slidecast_style(tool_context: ToolContext, slide_style: str = "Clean Corporate", voiceover_style: str = "Energetic & Engaging") -> dict:
     """Sets the visual and vocal style for the upcoming Slidecast.
@@ -518,7 +569,7 @@ def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, d
     """
     log_message(f"Planning nanomation for: {slide_topic}...", Severity.INFO)
     
-    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Chase")
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
     
     prompt = (
         f"You are a Senior Motion Designer for {company_name}.\n"

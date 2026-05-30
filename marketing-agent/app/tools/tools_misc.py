@@ -15,7 +15,7 @@
 import json
 import os
 from google.adk.tools.tool_context import ToolContext
-from ..adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
 from ..adk_common.utils.utils_agents import SESSION_ARTIFACTS_STATE_KEY
 from ..state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
@@ -23,77 +23,98 @@ from ..state import (
     LOGO_IMAGE_URI_STATE_KEY,
     REFERENCE_GUIDELINES_STATE_KEY,
     PRODUCT_SETUP_DONE_STATE_KEY,
-    JPMC_LOGO_URI,
-    SAPPHIRE_CARD_URI,
-    FREEDOM_CARD_URI,
-    PRIVATE_WEALTH_CARD_URI,
     ASSET_REGISTRY_STATE_KEY,
     UPLOAD_COUNTER_STATE_KEY,
 )
 from ..utils.utils_gcs import set_output_folder
 
-def select_brand_preset(tool_context: ToolContext, preset_name: str):
-    """Loads official brand guidelines, logos, card mockups, and compliance
-    rules automatically for a JPMC brand preset.
+def select_brand_preset(tool_context: ToolContext, preset_name: str = None):
+    """Loads brand guidelines, logos, and compliance rules automatically for a preset.
 
     Args:
-        preset_name: The JPMC brand line to load.
+        preset_name: Optional. The brand line/product to load. If omitted, loads the default from config.json.
     """
-    presets = {
-        "Chase Sapphire Reserve": {
-            "company_name": "Chase",
-            "product_name": "Chase Sapphire Reserve Card",
-            "product_description": "Premium metal credit card offering travel and dining rewards.",
-            "target_audience": "Affluent jetsetters, young professionals.",
-            "logo_uri": JPMC_LOGO_URI,
-            "product_image_uri": SAPPHIRE_CARD_URI,
-            "guide_file": "chase_sapphire_marketing_guide.md",
-            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'Chase'. DO NOT mention 'J.P. Morgan', 'JPMorgan', or 'JPMC'."
-        },
-        "Chase Freedom Unlimited": {
-            "company_name": "Chase",
-            "product_name": "Chase Freedom Unlimited Card",
-            "product_description": "Cashback credit card with zero annual fee.",
-            "target_audience": "Everyday value seekers, students, families.",
-            "logo_uri": JPMC_LOGO_URI,
-            "product_image_uri": FREEDOM_CARD_URI,
-            "guide_file": "chase_freedom_marketing_guide.md",
-            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'Chase'. DO NOT mention 'J.P. Morgan', 'JPMorgan', or 'JPMC'."
-        },
-        "J.P. Morgan Private Wealth": {
-            "company_name": "J.P. Morgan",
-            "product_name": "J.P. Morgan Private Client Wealth Management",
-            "product_description": "Exclusive wealth advisory and estate planning.",
-            "target_audience": "Ultra-high-net-worth individuals.",
-            "logo_uri": JPMC_LOGO_URI,
-            "product_image_uri": PRIVATE_WEALTH_CARD_URI,
-            "guide_file": "jp_morgan_private_wealth_marketing_guide.md",
-            "exclusion_rules": "STRICT BRAND WALL: Use ONLY 'J.P. Morgan'. DO NOT mention 'Chase'."
-        }
-    }
+    # 1. Determine active brand
+    active_brand = os.environ.get("ACTIVE_BRAND", "goog")
+    brand_dir = os.path.join(os.path.dirname(__file__), "..", "brands", active_brand)
+    
+    # 2. Load global config (Vault data)
+    config_path = os.path.join(brand_dir, "config.json")
+    brand_vault_info = ""
+    default_preset = None
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+                brand_vault_info = config_data.get("brand_vault_table", "")
+                default_preset = config_data.get("default_brand_preset")
+        except Exception: pass
+
+    # Use default if no preset provided
+    if not preset_name:
+        preset_name = default_preset
+        if not preset_name:
+             return {"status": "error", "details": "No preset name provided and no default found in config."}
+
+    # 3. Load presets config
+    presets_path = os.path.join(brand_dir, "presets.json")
+    presets = {}
+    if os.path.exists(presets_path):
+        try:
+            with open(presets_path, "r") as f:
+                presets = json.load(f)
+        except Exception as e:
+            log_message(f"Failed to load presets for {active_brand}: {e}", Severity.ERROR)
 
     if preset_name not in presets:
-        return {"status": "error", "details": f"Invalid brand preset '{preset_name}'."}
+        # Try fuzzy match if exact match fails
+        matches = [k for k in presets.keys() if preset_name.lower() in k.lower()]
+        if matches: preset_name = matches[0]
+        else: return {"status": "error", "details": f"Invalid brand preset '{preset_name}' for brand '{active_brand}'."}
 
     preset = presets[preset_name]
     
-    # Read the marketing guide from app/assets/samples
-    guide_content = ""
-    guide_path = os.path.join(os.path.dirname(__file__), "assets", "samples", preset["guide_file"])
-    if os.path.exists(guide_path):
-        try:
-            with open(guide_path, "r") as f:
-                guide_content = f.read()
-        except Exception:
-            pass
+    # Resolve brand-specific placeholders (e.g. {{GOOGLE_CLOUD_BUCKET_ARTIFACTS}})
+    import re
+    def resolve_placeholders(text: str) -> str:
+        if not text: return ""
+        # Recursively resolve environment variables
+        return re.sub(r"\{\{([A-Z0-9_]+)\}\}", lambda m: os.environ.get(m.group(1), m.group(0)), text)
 
-    # Inject exclusion rules at the TOP of guidelines
-    final_guidelines = f"{preset['exclusion_rules']}\n\n{guide_content}" if guide_content else preset['exclusion_rules']
+    # CHECK FOR LOCAL ASSETS FIRST
+    # We prioritize local files shipped with the code for maximum reliability
+    local_logo_path = os.path.join(brand_dir, "assets", "logo.png")
+    local_product_path = os.path.join(brand_dir, "assets", "product_image.png")
 
-    tool_context.state[PRODUCT_COMPANY_NAME_STATE_KEY] = preset["company_name"]
-    tool_context.state["PRODUCT_NAME"] = preset["product_name"]
-    tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = preset["product_image_uri"]
-    tool_context.state[LOGO_IMAGE_URI_STATE_KEY] = preset["logo_uri"]
+    if os.path.exists(local_logo_path):
+        logo_uri = local_logo_path
+        log_message(f"Using local brand logo: {logo_uri}", Severity.INFO)
+    else:
+        logo_uri = resolve_placeholders(preset.get("logo_uri", ""))
+
+    if os.path.exists(local_product_path):
+        product_image_uri = local_product_path
+        log_message(f"Using local product image: {product_image_uri}", Severity.INFO)
+    else:
+        product_image_uri = resolve_placeholders(preset.get("product_image_uri", ""))
+    
+    # 4. Construct the dynamic guidelines (Merge Vault + Visual Identity + Exclusions)
+    visual_identity = resolve_placeholders(preset.get("visual_identity", "No specific visual identity rules."))
+    exclusion_rules = resolve_placeholders(preset.get("exclusion_rules", ""))
+    
+    # Resolve any placeholders inside the vault table itself
+    brand_vault_info = resolve_placeholders(brand_vault_info)
+
+    final_guidelines = (
+        f"### GLOBAL BRAND VAULT (COLORS & LOGOS)\n{brand_vault_info}\n\n"
+        f"### PRODUCT VISUAL IDENTITY\n{visual_identity}\n\n"
+        f"### BRAND WALL & EXCLUSIONS\n{exclusion_rules}"
+    )
+
+    tool_context.state[PRODUCT_COMPANY_NAME_STATE_KEY] = preset.get("company_name", active_brand.upper())
+    tool_context.state["PRODUCT_NAME"] = preset.get("product_name", "Product")
+    tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = product_image_uri
+    tool_context.state[LOGO_IMAGE_URI_STATE_KEY] = logo_uri
     tool_context.state[REFERENCE_GUIDELINES_STATE_KEY] = final_guidelines
 
     set_output_folder(tool_context)
@@ -102,18 +123,29 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str):
     return {"status": "success", "preset_loaded": preset_name}
 
 def query_internal_knowledge_base(query: str, brand: str) -> str:
-    """Queries the internal JPMC knowledge base for specific brand guidelines."""
-    kb_path = os.path.join(os.path.dirname(__file__), "data", "website_kb.json")
+    """Queries the internal brand knowledge base for specific brand guidelines."""
+    # 1. Determine active brand
+    active_brand = os.environ.get("ACTIVE_BRAND", "goog")
+    brand_dir = os.path.join(os.path.dirname(__file__), "..", "brands", active_brand)
+    
+    kb_path = os.path.join(brand_dir, "data", "kb.json")
     if not os.path.exists(kb_path):
-        return "Knowledge base not found."
+        return f"Knowledge base not found for brand '{active_brand}'."
     
     try:
         with open(kb_path, "r") as f:
             kb = json.load(f)
         
+        # Use the specific product/sub-brand if provided, otherwise check all keys
         brand_data = kb.get(brand, [])
         if not brand_data:
-            return f"No information found for brand '{brand}'."
+             # Fallback: if 'brand' (preset name) isn't a key, maybe it's just the first key
+             first_key = next(iter(kb.keys())) if kb else None
+             if first_key:
+                 brand_data = kb.get(first_key, [])
+        
+        if not brand_data:
+            return f"No information found for '{brand}' in '{active_brand}' knowledge base."
         
         # Simple keyword matching
         for chunk in brand_data:
@@ -164,9 +196,10 @@ def rename_asset_tag(tool_context: ToolContext, old_tag: str, new_tag: str):
 
 async def deploy_react_website(tool_context: ToolContext, brand_name: str, html_code: str) -> dict:
     """Simulates deploying a React-based landing page for the campaign."""
-    return {"status": "success", "url": "https://chase-demo-landing-page.web.app", "details": "Website deployed successfully!"}
+    return {"status": "success", "url": f"https://{brand_name.lower().replace(' ', '-')}-landing-page.web.app", "details": "Website deployed successfully!"}
 
-async def run_production_test(tool_context: ToolContext, url: str = "https://www.chase.com/personal/investments/curriculum/save-and-invest", asset_uri: str = None) -> dict:
+@stream_status("🚀 Launching the full production test pipeline...")
+async def run_production_test(tool_context: ToolContext, url: str = "https://www.google.com", asset_uri: str = None) -> dict:
     """EASTER EGG: A special shortcut to test the full production pipeline OR generate a signed URL for a specific asset.
     
     Args:
@@ -195,8 +228,11 @@ async def run_production_test(tool_context: ToolContext, url: str = "https://www
     
     log_message(f"Running full production test for {url}...", Severity.INFO)
     
-    # 1. Setup Brand & Style (Ensures we follow the style guide)
-    select_brand_preset(tool_context, "Chase Sapphire Reserve")
+    # 1. Setup Brand & Style
+    active_brand = os.environ.get("ACTIVE_BRAND", "goog")
+    # Resolve default preset from config if possible
+    preset_name = "Google Search & AI Services" 
+    select_brand_preset(tool_context, preset_name)
     # Using 'Modern 3D Isometric' and 'Professional & Trustworthy' (Kalliope)
     select_slidecast_style(tool_context, "Modern 3D Isometric", "Professional & Trustworthy")
     

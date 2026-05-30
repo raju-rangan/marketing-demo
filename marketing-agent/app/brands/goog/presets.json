@@ -1,0 +1,12 @@
+{
+  "Google Search & AI Services": {
+    "company_name": "Google",
+    "product_name": "Google Search",
+    "product_description": "The world's most advanced search engine, now supercharged with generative AI to help users find information, create, and explore the world more intuitively.",
+    "target_audience": "Global internet users of all ages, ranging from students and researchers to casual browsers and professional power users.",
+    "logo_uri": "gs://{{GOOGLE_CLOUD_BUCKET_ARTIFACTS}}/brands/goog/assets/logo.png",
+    "product_image_uri": "gs://{{GOOGLE_CLOUD_BUCKET_ARTIFACTS}}/brands/goog/assets/product_image.png",
+    "visual_identity": "Primary Colors: Google Blue (#4285F4), Google Red (#EA4335), Google Yellow (#FBBC05), Google Green (#34A853). Backgrounds should be primarily white or very light gray to emphasize a clean UI. Photography Style: Lifestyle imagery featuring diverse people in natural, well-lit environments, showing technology as a helpful background tool. Typography: Google Sans or Product Sans for headlines; Roboto for body copy.",
+    "exclusion_rules": "No dark mode UI in marketing assets unless specifically showcasing a feature. No heavy shadows or skeuomorphic elements. No mention of Bing, DuckDuckGo, or Yahoo."
+  }
+}

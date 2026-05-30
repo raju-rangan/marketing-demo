@@ -19,8 +19,8 @@
 import re
 from xml.etree import ElementTree as ET
 
-from .adk_common.utils.constants import get_required_env_var
-from .adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.constants import get_required_env_var
+from ..adk_common.utils.utils_logging import Severity, log_message
 from google import genai
 from google.genai import types
 

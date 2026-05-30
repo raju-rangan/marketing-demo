@@ -240,6 +240,7 @@ class SlidecastSlide(BaseModel):
     text_overlay: Optional[str] = None
     image_url: Optional[str] = None
     audio_url: Optional[str] = None
+    video_url: Optional[str] = None
 
 class SlidecastStoryboard(BaseModel):
     title: str

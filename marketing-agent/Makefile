@@ -1,6 +1,26 @@
 -include .env
 export
 
+# Use BRAND or brand if provided (e.g. make playground BRAND=goog), otherwise fallback to ACTIVE_BRAND from .env
+BRAND_INPUT := $(if $(BRAND),$(BRAND),$(brand))
+BRAND_ID := $(if $(BRAND_INPUT),$(shell echo "$(BRAND_INPUT)" | tr '[:upper:]' '[:lower:]' | tr ' ' '_'),$(ACTIVE_BRAND))
+
+# Sync brand assets and update .env if needed
+sync-assets: authenticate
+	@if [ -z "$(BRAND_ID)" ]; then echo "❌ ERROR: BRAND is required (or set ACTIVE_BRAND in .env)"; exit 1; fi
+	@if [ ! -d "app/brands/$(BRAND_ID)" ]; then echo "❌ ERROR: Brand folder 'app/brands/$(BRAND_ID)' not found."; exit 1; fi
+	@# Update .env if a brand was explicitly provided
+	@if [ ! -z "$(BRAND_INPUT)" ]; then \
+		sed -i '' "s/^ACTIVE_BRAND=.*/ACTIVE_BRAND=$(BRAND_ID)/" .env 2>/dev/null || \
+		sed -i "s/^ACTIVE_BRAND=.*/ACTIVE_BRAND=$(BRAND_ID)/" .env || \
+		echo "ACTIVE_BRAND=$(BRAND_ID)" >> .env; \
+		echo "✅ Persistent brand set to: $(BRAND_ID)"; \
+	fi
+	@echo "🔄 Syncing assets for brand: $(BRAND_ID)..."
+	@if [ -d "app/brands/$(BRAND_ID)/assets" ]; then \
+		gsutil -m rsync -r app/brands/$(BRAND_ID)/assets gs://$(GOOGLE_CLOUD_BUCKET_ARTIFACTS)/brands/$(BRAND_ID)/assets; \
+	fi
+
 # ==============================================================================
 # Installation & Setup
 # ==============================================================================
@@ -19,10 +39,11 @@ authenticate:
 	gcloud auth application-default login
 	@AUTH_PROJECT=$$(gcloud config get-value project 2>/dev/null); \
 	if [ "$$AUTH_PROJECT" != "$(GOOGLE_CLOUD_PROJECT)" ]; then \
-		echo "❌ ERROR: Authenticated project ($$AUTH_PROJECT) does not match GOOGLE_CLOUD_PROJECT ($(GOOGLE_CLOUD_PROJECT)) in .env"; \
-		exit 1; \
-	fi; \
-	echo "✅ Authenticated project matches GOOGLE_CLOUD_PROJECT: $$AUTH_PROJECT"
+		echo "🔄 Authenticated project ($$AUTH_PROJECT) does not match. Setting project to $(GOOGLE_CLOUD_PROJECT)..."; \
+		gcloud config set project $(GOOGLE_CLOUD_PROJECT); \
+	else \
+		echo "✅ Authenticated project matches GOOGLE_CLOUD_PROJECT: $$AUTH_PROJECT"; \
+	fi
 	gcloud auth application-default set-quota-project $(GOOGLE_CLOUD_PROJECT)
 
 # ==============================================================================
@@ -30,30 +51,55 @@ authenticate:
 # ==============================================================================
 
 # Launch local dev playground
-playground: authenticate
+# Usage: make playground [BRAND=bofa]
+playground: sync-assets
 	@echo "==============================================================================="
 	@echo "| 🚀 Starting your agent playground...                                        |"
 	@echo "|                                                                             |"
-	@echo "| 💡 Try asking: Set up a marketing campaign for a new financial product.   |"
+	@echo "| 🏷️  Active Brand: $(BRAND_ID)"
+	@echo "| 💡 Try asking: Set up a marketing campaign for a new product.            |"
 	@echo "|                                                                             |"
 	@echo "| 🌐 Project ID: $(GOOGLE_CLOUD_PROJECT)"
 	@echo "| 🪣 Artifacts Bucket: $(GOOGLE_CLOUD_BUCKET_ARTIFACTS)"
-	@echo "|                                                                             |"
-	@echo "| 🔍 IMPORTANT: Select the 'app' folder (JPMC Marketing Agent) to interact with your agent. |"
 	@echo "==============================================================================="
-	uv run adk web . --port 8501 --reload_agents
+	export ACTIVE_BRAND=$(BRAND_ID); uv run adk web . --port 8501 --reload_agents
+
+# Alias for debugging
+debug: playground
+
+# Set up a new brand profile
+# Usage: make setup-brand BRAND="Brand Name" [URL="https://brand.com"]
+setup-brand: authenticate
+	@if [ -z "$(BRAND)" ]; then echo "❌ ERROR: BRAND is required. Usage: make setup-brand BRAND=\"Brand Name\""; exit 1; fi
+	uv run -m app.app_utils.onboard_brand --name "$(BRAND)" $(if $(URL),--url "$(URL)")
+	@$(MAKE) sync-assets BRAND="$(BRAND)"
+
+# Remove a brand profile
+# Usage: make remove-brand BRAND="Brand Name"
+remove-brand:
+	@if [ -z "$(BRAND)" ]; then echo "❌ ERROR: BRAND is required. Usage: make remove-brand BRAND=\"Brand Name\""; exit 1; fi
+	@BRAND_ID=$$(echo "$(BRAND)" | tr '[:upper:]' '[:lower:]' | tr ' ' '_'); \
+	if [ -d "app/brands/$$BRAND_ID" ]; then \
+		rm -rf "app/brands/$$BRAND_ID"; \
+		echo "✅ Brand '$$BRAND_ID' removed successfully."; \
+	else \
+		echo "⚠️ Brand '$$BRAND_ID' not found."; \
+	fi
 
 # ==============================================================================
 # Backend Deployment Targets
 # ==============================================================================
 
 # Deploy the agent remotely
-# Usage: make deploy [AGENT_IDENTITY=true] [SECRETS="KEY=SECRET_ID,..."] - Set AGENT_IDENTITY=true to enable per-agent IAM identity (Preview)
-deploy: authenticate
+# Usage: make deploy [BRAND=goog] [AGENT_IDENTITY=true] [SECRETS="KEY=SECRET_ID,..."]
+deploy: sync-assets
+	@echo "==============================================================================="
+	@echo "| 🚢 Deploying agent for brand: $(BRAND_ID)...                         |"
+	@echo "==============================================================================="
 	# Export dependencies to requirements file using uv export.
 	(uv export --no-hashes --no-header --no-dev --no-emit-project --no-annotate > app/app_utils/.requirements.txt 2>/dev/null || \
 	uv export --no-hashes --no-header --no-dev --no-emit-project > app/app_utils/.requirements.txt) && \
-	uv run -m app.app_utils.deploy \
+	export ACTIVE_BRAND=$(BRAND_ID); uv run -m app.app_utils.deploy \
 		--source-packages=./app \
 		--entrypoint-module=app.agent_engine_app \
 		--entrypoint-object=agent_engine \
@@ -78,13 +124,13 @@ test:
 # ==============================================================================
 
 # Run agent evaluation using ADK eval
-# Usage: make eval [EVALSET=tests/eval/evalsets/basic.evalset.json] [EVAL_CONFIG=tests/eval/eval_config.json]
-eval:
+# Usage: make eval [BRAND=goog] [EVALSET=tests/eval/evalsets/basic.evalset.json] [EVAL_CONFIG=tests/eval/eval_config.json]
+eval: sync-assets
 	@echo "==============================================================================="
-	@echo "| Running Agent Evaluation                                                    |"
+	@echo "| 🧪 Running Agent Evaluation for brand: $(BRAND_ID)                      |"
 	@echo "==============================================================================="
 	uv sync --dev --extra eval
-	uv run adk eval ./app $${tests/eval/evalsets/marketing.evalset.json} \
+	export ACTIVE_BRAND=$(BRAND_ID); uv run adk eval ./app $(if $(EVALSET),$(EVALSET),tests/eval/evalsets/marketing.evalset.json) \
 		$(if $(EVAL_CONFIG),--config_file_path=$(EVAL_CONFIG),$(if $(wildcard tests/eval/eval_config.json),--config_file_path=tests/eval/eval_config.json,))
 
 # Run evaluation with all evalsets

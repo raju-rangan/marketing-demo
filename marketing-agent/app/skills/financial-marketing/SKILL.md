@@ -17,7 +17,7 @@ Advertising financial products (banking, wealth management, lending, credit card
 ### B. Mandatory Disclosures & Anchors
 - **Pricing Disclosures**: Whenever pricing, rates (APR/APY), fees, or card rewards are advertised, we MUST append compliance text.
 - **Standard Anchors**:
-  - For Chase: `Chase Sapphire Reserve®. Subject to credit approval. Terms and conditions apply.`
+  - For Example: `Brand Product Name®. Subject to credit approval. Terms and conditions apply.`
   - Generic Financial: `Subject to eligibility and credit approval. Terms and fees may apply.`
 - **Placement**:
   - In Text Ads: Must be included in at least one description or headline where room allows.

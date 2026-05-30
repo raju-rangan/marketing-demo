@@ -116,6 +116,51 @@ def sanitize_arg(arg):
     return res
 
 
+def log_status(message: str):
+    """Logs a status update that the UI can catch via stdout redirection.
+    
+    Args:
+        message: The status message to display in the UI.
+    """
+    print(f"ui:status_update {message}", flush=True)
+
+
+def stream_status(start_message: str = "Working...", success_message: str = "Done.", error_message: str = "Error occurred"):
+    """Decorator to stream start/end status messages to the UI.
+    
+    Args:
+        start_message: Message to show when the tool starts.
+        success_message: Message to show on success.
+        error_message: Message to show on exception.
+    """
+    def decorator(func):
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                log_status(start_message)
+                try:
+                    result = await func(*args, **kwargs)
+                    log_status(success_message)
+                    return result
+                except Exception as e:
+                    log_status(f"{error_message}: {e}")
+                    raise
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                log_status(start_message)
+                try:
+                    result = func(*args, **kwargs)
+                    log_status(success_message)
+                    return result
+                except Exception as e:
+                    log_status(f"{error_message}: {e}")
+                    raise
+            return sync_wrapper
+    return decorator
+
+
 def log_function_call(func):
     """Decorator to log function calls and arguments with execution time."""
     if asyncio.iscoroutinefunction(func):

@@ -1,14 +1,14 @@
 {
-  "eval_set_id": "marketing_workflow_eval",
-  "name": "JPMC Marketing Workflow Evaluation",
-  "description": "Comprehensive evaluation of the JPMC Marketing Assistant's ability to ideate, storyboard, and produce cinematic campaigns while maintaining brand integrity.",
+  "eval_set_id": "goog_marketing_workflow_eval",
+  "name": "GOOG Marketing Workflow Evaluation",
+  "description": "Comprehensive evaluation of the Marketing Assistant's ability to ideate, storyboard, and produce cinematic campaigns for GOOG products.",
   "eval_cases": [
     {
-      "eval_id": "autopilot_sapphire_luxury",
+      "eval_id": "autopilot_search_ai",
       "conversation": [
         {
           "user_content": {
-            "parts": [{"text": "Autopilot: Pitch me a Sapphire Reserve campaign for luxury jetsetters"}]
+            "parts": [{"text": "Autopilot: Pitch me a campaign for Google Search & AI Services focused on students"}]
           }
         }
       ],
@@ -19,11 +19,11 @@
       }
     },
     {
-      "eval_id": "brand_integrity_chase",
+      "eval_id": "brand_integrity_goog",
       "conversation": [
         {
           "user_content": {
-            "parts": [{"text": "I want to launch a campaign for Chase Sapphire Reserve. Give me some ideas."}]
+            "parts": [{"text": "I want to launch a campaign for Google Search. Give me some ideas."}]
           }
         }
       ],
@@ -34,26 +34,11 @@
       }
     },
     {
-      "eval_id": "brand_integrity_jpm",
+      "eval_id": "storyboard_generation_goog",
       "conversation": [
         {
           "user_content": {
-            "parts": [{"text": "Set up a Private Wealth campaign for ultra high net worth individuals. Aesthetic should be quiet luxury."}]
-          }
-        }
-      ],
-      "session_input": {
-        "app_name": "app",
-        "user_id": "eval_user",
-        "state": {}
-      }
-    },
-    {
-      "eval_id": "storyboard_generation_24s",
-      "conversation": [
-        {
-          "user_content": {
-            "parts": [{"text": "Generate a 24-second cinematic storyboard for a Chase Freedom Unlimited campaign focused on young families starting their journey."}]
+            "parts": [{"text": "Generate a 24-second cinematic storyboard for a Google Search campaign focused on everyday helpfulness."}]
           }
         }
       ],
@@ -61,13 +46,13 @@
         "app_name": "app",
         "user_id": "eval_user",
         "state": {
-           "PRODUCT_COMPANY_NAME": "Chase",
-           "PRODUCT_NAME": "Freedom Unlimited"
+           "PRODUCT_COMPANY_NAME": "GOOG",
+           "PRODUCT_NAME": "Google Search"
         }
       }
     },
     {
-      "eval_id": "video_production_request",
+      "eval_id": "video_production_request_goog",
       "conversation": [
         {
           "user_content": {
@@ -80,15 +65,15 @@
         "user_id": "eval_user",
         "state": {
           "STORYLINE_DATA": {
-            "storyline": "Your journey begins today. With Chase Freedom Unlimited, every moment counts.",
+            "storyline": "The information you need, right when you need it. Google Search: organizing the world's information for you.",
             "acts": [
-              {"act_number": 1, "scene_description": "Family in park", "voiceover": "Your journey begins today."},
-              {"act_number": 2, "scene_description": "Close up of card", "voiceover": "With Chase Freedom Unlimited, every moment counts."}
+              {"act_number": 1, "scene_description": "Student studying in cafe", "voiceover": "The information you need, right when you need it."},
+              {"act_number": 2, "scene_description": "Clean search interface reveal", "voiceover": "Google Search: organizing the world's information for you."}
             ]
           },
-          "STORYBOARD_KEYFRAMES": ["gs://bucket/f1.png", "gs://bucket/f2.png"],
-          "PRODUCT_COMPANY_NAME": "Chase",
-          "PRODUCT_NAME": "Freedom Unlimited"
+          "STORYBOARD_KEYFRAMES": ["gs://bucket/goog_f1.png", "gs://bucket/goog_f2.png"],
+          "PRODUCT_COMPANY_NAME": "GOOG",
+          "PRODUCT_NAME": "Google Search"
         }
       }
     }

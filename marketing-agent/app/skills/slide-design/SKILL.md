@@ -42,7 +42,7 @@ Every slide must be **self-sufficient**. The viewer should be able to understand
 3.  **Data Callouts**: Small labels that explain specific parts of the visual.
 
 ## Compliance & Branding
-- **Logo Integration**: Integrate the brand logo (Chase or J.P. Morgan) subtly into a corner or header area as part of the visual layout.
-- **Color Palette**: Use the brand's primary color palette for all diagrams, background panels, and UI elements (e.g., Chase Blue/White or J.P. Morgan Navy/Gold).
-- **Tone**: Maintain a "Premium Educational" tone that aligns with the specific brand identity—approachable for Chase, or "Quiet Luxury" for J.P. Morgan.
-- **Brand Wall**: NEVER mention a forbidden brand name (e.g., no "Chase" in J.P. Morgan slides and vice versa).
+- **Logo Integration**: Integrate the brand logo subtly into a corner or header area as part of the visual layout.
+- **Color Palette**: Use the brand's primary color palette as defined in the Brand Vault for all diagrams, background panels, and UI elements.
+- **Tone**: Maintain a tone that aligns with the specific brand identity and guidelines.
+- **Brand Wall**: Adhere strictly to the exclusion rules defined in the Brand Vault.

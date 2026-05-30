@@ -207,3 +207,6 @@ tools/a2a-inspector/
 .adk/**
 
 .env.bak
+
+# Brand configurations
+app/brands/

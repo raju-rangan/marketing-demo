@@ -24,6 +24,8 @@ from enum import Enum
 import imageio_ffmpeg
 
 import re
+from PIL import Image
+import io
 
 class Severity(Enum):
     INFO = logging.INFO
@@ -401,7 +403,12 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
 
 def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0) -> bytes | None:
     """
-    Compiles a slidecast video using ffmpeg with hard cuts (fast).
+    Compiles a slidecast video using ffmpeg.
+    For each slide, it uses the generated video as a 'dynamic intro'. 
+    If the audio duration exceeds the video duration (typically 8s), 
+    it seamlessly appends the original static image to hold the visual 
+    with high resolution for the remainder of the talk track.
+    
     `slides` is a list of dicts: {"image_bytes": bytes, "video_bytes": Optional[bytes], "audio_bytes": bytes, "text_overlay": str}
     """
     if not slides:
@@ -411,41 +418,55 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
         inputs = []
         filter_complex = []
         
+        # Track the input index (alternating between visual and audio)
+        input_count = 0
+        
         for i, slide in enumerate(slides):
             img_path = os.path.join(tmpdir, f"img_{i}.png")
             vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
             
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
+            with open(img_path, "wb") as f: f.write(slide["image_bytes"])
             
-            dur = get_video_duration(aud_path)
-            if dur <= 0:
+            aud_dur = get_video_duration(aud_path)
+            if aud_dur <= 0:
                 log_message(f"Failed to get audio duration for slide {i}, defaulting to 5.0s", Severity.WARNING)
-                dur = 5.0
+                aud_dur = 5.0
             
-            # Use video if provided, else image
-            is_video = False
-            if slide.get("video_bytes"):
-                with open(vid_path, "wb") as f: f.write(slide["video_bytes"])
-                # Play video once, we'll hold the last frame with tpad
-                inputs.extend(["-i", vid_path])
-                is_video = True
-            else:
-                with open(img_path, "wb") as f: f.write(slide["image_bytes"])
-                inputs.extend(["-loop", "1", "-t", str(dur), "-i", img_path])
-                
-            inputs.extend(["-i", aud_path])
+            v_idx = input_count
+            input_count += 1
             
-            v_idx = i * 2
-            a_idx = i * 2 + 1
             text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
             
-            # Scale, pad, and trim the video stream to exactly match the audio duration
-            if is_video:
-                # Use tpad to hold the last frame indefinitely, then trim to exact audio duration
-                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,tpad=stop=-1:stop_mode=clone,trim=duration={dur},setpts=PTS-STARTPTS,"
+            if slide.get("video_bytes"):
+                with open(vid_path, "wb") as f: f.write(slide["video_bytes"])
+                vid_dur = get_video_duration(vid_path)
+                if vid_dur <= 0: vid_dur = 8.0 # Default to 8s for Veo
+                
+                inputs.extend(["-i", vid_path])
+                
+                # Check if we need to append the static image
+                if aud_dur > vid_dur:
+                    # Append the image as a second visual input for this slide
+                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", img_path])
+                    img_idx = input_count
+                    input_count += 1
+                    
+                    # Concat video and looped image for this slide
+                    v_filter = (
+                        f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[v_vid_{i}];"
+                        f"[{img_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[v_img_{i}];"
+                        f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                    )
+                else:
+                    # Audio is shorter or equal to video, just trim video
+                    v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
             else:
-                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,trim=duration={dur},setpts=PTS-STARTPTS,"
+                # No video, just loop the image
+                inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
+                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+
             if text:
                 v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
             
@@ -453,6 +474,10 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
             v_filter += f"[v{i}];"
             filter_complex.append(v_filter)
             
+            # Add audio input
+            inputs.extend(["-i", aud_path])
+            a_idx = input_count
+            input_count += 1
             # Force stereo/sample rate for consistent concat
             filter_complex.append(f"[{a_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];")
 

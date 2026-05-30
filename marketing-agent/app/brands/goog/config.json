@@ -1,0 +1,9 @@
+{
+  "brand_name": "GOOG",
+  "default_brand_preset": "Google Search & AI Services",
+  "brand_persona_description": "A Product Marketing Manager (PMM) at Google who is data-driven, user-centric, and focused on 'helpfulness.' They navigate a complex matrix organization where every campaign must align with the mission to 'organize the world's information.' They sell to leadership by demonstrating how marketing initiatives drive ecosystem growth, user trust, and long-term brand equity rather than just short-term clicks.",
+  "compliance_guidelines": "Adherence to global data privacy regulations including GDPR and CCPA is mandatory. All AI-related marketing must follow Google's AI Principles (socially beneficial, avoiding bias, safety). Strict trademark usage for the Google logo and sub-brands is required. All creative must meet WCAG 2.1 accessibility standards.",
+  "brand_vault_table": "| Brand Name | Logo URI | Product Image URI | Color System | Tone |\n| :--- | :--- | :--- | :--- | :--- |\n| Google | gs://{{GOOGLE_CLOUD_BUCKET_ARTIFACTS}}/brands/goog/assets/logo.png | gs://{{GOOGLE_CLOUD_BUCKET_ARTIFACTS}}/brands/goog/assets/product_image.png | Google Blue, Red, Yellow, Green | Helpful, Human, Optimistic, Bold |",
+  "exclusion_rules": "Strictly avoid any direct visual or textual comparison to primary competitors such as Microsoft (Bing), Apple, or Amazon in a disparaging manner. Do not use cluttered or dark/moody aesthetics that contradict the brand's 'clean and bright' philosophy. Avoid the use of off-brand primary colors that deviate from the specific Google hex codes.",
+  "brand_wall_rules": "Maintain clear visual separation between consumer products (Search, YouTube, Maps) and enterprise solutions (Google Cloud, Workspace). Ensure the 'Google' prefix is used correctly according to naming architecture guidelines. The 'G' favicon must not be modified or stylized."
+}

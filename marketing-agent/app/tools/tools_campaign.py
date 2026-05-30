@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import json
+import os
 from google.adk.tools.tool_context import ToolContext
 from ..adk_common.dtos.generated_media import GeneratedMedia
 from ..adk_common.utils import utils_agents, utils_gcs, utils_prompts
-from ..adk_common.utils.utils_logging import Severity, log_message
+from ..adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
 
 from ..state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
@@ -26,8 +27,6 @@ from ..state import (
     REFERENCE_GUIDELINES_STATE_KEY,
     CHOSEN_CAMPAIGN_IDEA_STATE_KEY,
     CHOSEN_ASSET_SHEET_ID_STATE_KEY,
-    CUSTOMER_PERSONA_STATE_KEY,
-    CUSTOMER_PERSONAS,
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     AGENT_VERSION,
 )
@@ -42,6 +41,7 @@ from ..utils.utils_gcs import set_output_folder
 _CACHED_CAMPAIGNS_LIST: list[Campaign] | None = None
 _CACHED_IDEAS_STRING: str | None = None
 
+@stream_status("🧩 Building the creative campaign architecture...")
 async def setup_product_campaign(
     tool_context: ToolContext,
     company_name: str,
@@ -150,19 +150,3 @@ def get_selected_brief(tool_context: ToolContext, selected_campaign_name: str):
             return {"status": "success", "brief": c.__dict__}
     
     return {"status": "error", "details": f"Campaign '{selected_campaign_name}' not found."}
-
-def set_customer_persona(tool_context: ToolContext, persona_number: int):
-    """Sets the target customer persona for the campaign."""
-    persona = CUSTOMER_PERSONAS.get(persona_number)
-    if not persona:
-        return {"status": "error", "details": f"Invalid persona number. Choose 1-{len(CUSTOMER_PERSONAS)}."}
-    
-    tool_context.state[CUSTOMER_PERSONA_STATE_KEY] = persona["description"]
-    set_output_folder(tool_context)
-    return {"status": "success", "persona": persona["name"], "description": persona["description"]}
-
-def clear_customer_persona(tool_context: ToolContext):
-    """Clears the customer persona from the session state."""
-    if CUSTOMER_PERSONA_STATE_KEY in tool_context.state:
-        tool_context.state[CUSTOMER_PERSONA_STATE_KEY] = None
-    return {"status": "success", "details": "Customer persona cleared."}
