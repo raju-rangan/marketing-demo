@@ -451,7 +451,7 @@ async def _generate_storyline(company_name: str, product_name: str, rationale: s
 
     guidelines_context = f"\n\nReference Guidelines: {reference_guidelines[:2000]}" if reference_guidelines else ""
     persona_context = f"\n\nTARGET PERSONA: {customer_persona}" if customer_persona else ""
-    brand_wall = _get_brand_wall_directive(company_name, guidelines=tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, ""))
+    brand_wall = _get_brand_wall_directive(company_name, guidelines=reference_guidelines)
     
     prompt = (
         f"You are a LIFESTYLE DOCUMENTARY DIRECTOR. Your specialty is capturing the pure joy of human moments.\n\n"
