@@ -122,25 +122,33 @@ def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
         return f"Error during research: {e}"
 
 @stream_status("📋 Designing the educational storyboard...")
-def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_minutes: int = 5, language: str = "English") -> dict:
-    """Generates a long-form SlidecastStoryboard (JSON) from a research report.
-    Enforces a Title Slide for Slide 1 and targets 160 WPM.
+def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_seconds: int = 300, language: str = "English", aspect_ratio: str = "16:9") -> dict:
+    """Generates a SlidecastStoryboard (JSON) from a research report.
+    Dynamically scales slide count and pacing for short-form (Shorts) or long-form videos.
     """
     # Fail-safe: Ensure brand identity is loaded
     if not tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY):
         log_message("Brand guidelines missing. Initializing default brand setup...", Severity.INFO)
         select_brand_preset(tool_context)
 
-    log_message(f"Generating branded storyboard for {duration_minutes} min video in {language}...", Severity.INFO)
+    log_message(f"Generating branded storyboard for {duration_seconds} sec video in {language} (Aspect Ratio: {aspect_ratio})...", Severity.INFO)
 
     company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
     brand_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
     brand_wall = _get_brand_wall_directive(company_name)
 
-    # Style & Word Count
-    total_word_target = duration_minutes * 160
-    num_slides = max(12, min(20, duration_minutes * 3))
-    words_per_slide = total_word_target // num_slides
+    # Style & Word Count for Shorts vs Long-form
+    duration_minutes = duration_seconds / 60.0
+    total_word_target = max(60, int(duration_minutes * 160)) # minimum 60 words for shorts
+    
+    if duration_seconds <= 60:
+        # Shorts mode
+        num_slides = max(3, int(duration_seconds / 15))
+    else:
+        # Long-form mode
+        num_slides = max(12, min(20, int(duration_minutes * 3)))
+        
+    words_per_slide = max(10, total_word_target // num_slides)
     
     selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Flat Vector Explainer")
     style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Flat Vector Explainer"])
@@ -204,6 +212,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
 
         # Verify JSON
         storyboard_data = json.loads(response.text)
+        storyboard_data["aspect_ratio"] = aspect_ratio
         return storyboard_data
     except Exception as e:
         log_message(f"Storyboard generation failed: {e}", Severity.ERROR)
@@ -325,7 +334,8 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
             styled_prompt = f"{slide.image_prompt}\n\nREFERENCE BRAND RULES:\n{ref_guidelines[:1000]}"
 
             # 3. Generate Image with logo reference
-            img_bytes = await _generate_gemini_image(styled_prompt, logo_bytes, label=f"slide_{idx+1}_image", aspect_ratio="16:9")
+            ar = sb.aspect_ratio
+            img_bytes = await _generate_gemini_image(styled_prompt, logo_bytes, label=f"slide_{idx+1}_image", aspect_ratio=ar)
 
             if not img_bytes:
                 log_message(f"Failed to generate image for slide {idx+1}", Severity.ERROR)

@@ -71,11 +71,7 @@ To generate final creative (Video, Images, Text Ads), you MUST have:
 3. **Campaign Brief & Persona**
 
 ## Module A: Shorts Generation (When user selects Option 1)
-If the user wants to create shorts from a URL:
-1. Ask for the target URLs.
-2. Call `research_urls_to_report(urls=[...])` to gather insights.
-3. Develop a fast-paced, highly engaging script and storyboard suitable for short-form platforms (TikTok, Reels, Shorts).
-4. Follow the standard creative iteration loop to get user approval before generating the final video assets.
+If the user wants to create shorts from a URL, you MUST load the `slidecast-production` skill and follow its workflow, ensuring you set the duration and aspect ratio for a short-form video (e.g., `duration_seconds=60`, `aspect_ratio="9:16"`).
 
 ## Module B: Intent-Driven Generation
 If the user asks for a specific asset (e.g., "Generate a storyboard", "Write ad copy", "Create branded images with a CTA", "Design website landing page information"), evaluate your dependencies:

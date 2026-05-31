@@ -17,7 +17,9 @@ Otherwise, fetch these resources as needed:
 ## Development Phases
 
 ### Phase 1: Understand Requirements
-Before writing any code, understand the project's requirements, constraints, and success criteria. ALWAYS ALWAYS ALWAYS state what you are going to do very succintly before generating any code. 
+Before writing any code, understand the project's requirements, constraints, and success criteria. ALWAYS ALWAYS ALWAYS state what you are going to do very very briefly before generating any code. Be as concise as possible to communicate what you are going to do.
+
+
 
 
 ### Phase 2: Build and Implement

@@ -247,6 +247,7 @@ class SlidecastStoryboard(BaseModel):
     slides: List[SlidecastSlide]
     music_prompt: Optional[str] = "Cinematic and educational background music"
     video_url: Optional[str] = None
+    aspect_ratio: str
 
 class NanomationPhase(BaseModel):
     description: str
