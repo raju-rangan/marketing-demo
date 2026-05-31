@@ -401,85 +401,80 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
         except Exception:
             return video_bytes
 
-def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0) -> bytes | None:
+def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9") -> bytes | None:
     """
     Compiles a slidecast video using ffmpeg.
-    For each slide, it uses the generated video as a 'dynamic intro'. 
-    If the audio duration exceeds the video duration (typically 8s), 
-    it seamlessly appends the original static image to hold the visual 
-    with high resolution for the remainder of the talk track.
-    
-    `slides` is a list of dicts: {"image_bytes": bytes, "video_bytes": Optional[bytes], "audio_bytes": bytes, "text_overlay": str}
+    ...
     """
     if not slides:
         return None
 
+    # Set canvas dimensions based on aspect ratio
+    if aspect_ratio == "9:16":
+        canvas_width, canvas_height = 720, 1280
+    else:
+        canvas_width, canvas_height = 1280, 720
+
     with tempfile.TemporaryDirectory() as tmpdir:
         inputs = []
         filter_complex = []
-        
+
         # Track the input index (alternating between visual and audio)
         input_count = 0
-        
+
         for i, slide in enumerate(slides):
+            # ... (same setup code for aud/img/vid paths)
             img_path = os.path.join(tmpdir, f"img_{i}.png")
             vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
-            
+
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
             with open(img_path, "wb") as f: f.write(slide["image_bytes"])
-            
+
             aud_dur = get_video_duration(aud_path)
             if aud_dur <= 0:
-                log_message(f"Failed to get audio duration for slide {i}, defaulting to 5.0s", Severity.WARNING)
                 aud_dur = 5.0
-            
+
             v_idx = input_count
             input_count += 1
-            
             text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
-            
+
+            # Canvas string
+            canvas_str = f"scale={canvas_width}:{canvas_height}:force_original_aspect_ratio=decrease,pad={canvas_width}:{canvas_height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+
             if slide.get("video_bytes"):
                 with open(vid_path, "wb") as f: f.write(slide["video_bytes"])
                 vid_dur = get_video_duration(vid_path)
-                if vid_dur <= 0: vid_dur = 8.0 # Default to 8s for Veo
-                
+                if vid_dur <= 0: vid_dur = 8.0
+
                 inputs.extend(["-i", vid_path])
-                
-                # Check if we need to append the static image
                 if aud_dur > vid_dur:
-                    # Append the image as a second visual input for this slide
                     inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", img_path])
                     img_idx = input_count
                     input_count += 1
-                    
-                    # Concat video and looped image for this slide
                     v_filter = (
-                        f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[v_vid_{i}];"
-                        f"[{img_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[v_img_{i}];"
+                        f"[{v_idx}:v]{canvas_str}[v_vid_{i}];"
+                        f"[{img_idx}:v]{canvas_str}[v_img_{i}];"
                         f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
                     )
                 else:
-                    # Audio is shorter or equal to video, just trim video
-                    v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                    v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
             else:
-                # No video, just loop the image
                 inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
-                v_filter = f"[{v_idx}:v]scale=1280:-2,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
 
             if text:
                 v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
-            
+
             v_filter = v_filter.rstrip(",")
             v_filter += f"[v{i}];"
             filter_complex.append(v_filter)
-            
-            # Add audio input
+
             inputs.extend(["-i", aud_path])
             a_idx = input_count
             input_count += 1
-            # Force stereo/sample rate for consistent concat
             filter_complex.append(f"[{a_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];")
+        # ... (rest of compilation)
 
         # Concat all slides (requires alternating v/a streams [v0][a0][v1][a1])
         concat_streams = "".join([f"[v{i}][a{i}]" for i in range(len(slides))])

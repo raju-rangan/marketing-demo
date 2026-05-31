@@ -233,6 +233,7 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
     log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s", Severity.INFO)
     log_message(f"📝 [VEO GEN PROMPT]: {prompt}", Severity.INFO)
     log_message(f"🖼️ [VEO GEN START FRAME]: {start_frame_gcs_uri}", Severity.INFO)
+    log_message(f"📏 [VEO GEN ASPECT RATIO]: {aspect_ratio}", Severity.INFO)
     if end_frame_gcs_uri:
         log_message(f"🏁 [VEO GEN END FRAME]: {end_frame_gcs_uri}", Severity.INFO)
 

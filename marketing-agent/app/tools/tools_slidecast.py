@@ -143,10 +143,10 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
     
     if duration_seconds <= 60:
         # Shorts mode
-        num_slides = max(3, int(duration_seconds / 15))
+        num_slides = max(3, int(duration_seconds / 7.5)) # 1 slide every ~7.5 seconds for shorts
     else:
         # Long-form mode
-        num_slides = max(12, min(20, int(duration_minutes * 3)))
+        num_slides = max(12, min(25, int(duration_minutes * 5))) # 5 slides per minute as a baseline, capped at 25 slides for very long videos
         
     words_per_slide = max(10, total_word_target // num_slides)
     
@@ -464,11 +464,13 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                 f"A STATIC, LOCKED-OFF CAMERA SHOT. The camera MUST NOT pan, tilt, zoom, or move in any way. "
                 f"The core layout, text, and composition MUST remain completely still and perfectly legible. "
                 f"Focus entirely on animating the EDUCATIONAL CONTENT on the screen using subtle, localized motion: "
-                f"1. Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing. "
+                f"1. Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing. For graphs, show the growth of the line or bars from left to right or bottom to top, but keep the axes and labels perfectly still. "
                 f"2. Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process. "
                 f"3. Text & Highlights: Add a subtle sweeping sheen or soft illumination behind key bullet points or focus areas to draw the eye. "
                 f"4. Icons & Spot illustrations: Give educational icons gentle, localized cinemagraph-style motion (e.g., a globe slowly spinning, a gear slowly turning). "
-                f"5. TEXT PRESERVATION IS ABSOLUTE: DO NOT add, alter, morph, or hallucinate any text. All text MUST remain completely frozen and perfectly readable. "
+                f"5. If there are people, or characters in the infographic, animate them with slow, purposeful actions that directly reflect the script (e.g., a person icon walking slowly when the script mentions 'progress' or 'movement')."
+                f"6. Simulate vehicle movement by keeping the vehicle in place but animating the wheels and adding subtle motion blur to imply movement, without actually moving the vehicle off its original position."
+                f"7. TEXT PRESERVATION IS ABSOLUTE: DO NOT add, alter, morph, or hallucinate any text. All text MUST remain completely frozen and perfectly readable. "
                 f"Keep all motion subtle, professional, and strictly constrained to the data/content elements without altering the slide layout." 
             )
             video_bytes = await _generate_single_veo_clip(
@@ -476,7 +478,8 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                 start_frame_gcs_uri=slide.image_url, 
                 clip_duration=8, 
                 end_frame_gcs_uri=slide.image_url, 
-                label=f"slide_anim_{idx+1}"
+                label=f"slide_anim_{idx+1}",
+                aspect_ratio=sb.aspect_ratio
             )
             
             if video_bytes:
@@ -524,7 +527,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         except Exception: pass
 
     # Compile
-    video_bytes = compile_slidecast_video(slides_data)
+    video_bytes = compile_slidecast_video(slides_data, aspect_ratio=sb.aspect_ratio)
     if not video_bytes:
         return {"status": "error", "details": "Failed to compile slidecast video."}
 

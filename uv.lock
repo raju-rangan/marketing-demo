@@ -2596,6 +2596,7 @@ lint = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "debugpy" },
     { name = "nest-asyncio" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -2638,6 +2639,7 @@ provides-extras = ["jupyter", "eval", "lint"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "debugpy", specifier = ">=1.8.0,<2.0.0" },
     { name = "nest-asyncio", specifier = ">=1.6.0,<2.0.0" },
     { name = "pytest", specifier = ">=8.3.4,<9.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.8,<1.0.0" },

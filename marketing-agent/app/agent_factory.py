@@ -64,7 +64,7 @@ from .tools.tools_slidecast import (
     finalize_slidecast_video,
     select_slidecast_style,
     generate_slide_animation_plan,
-    execute_slide_animation,
+    #execute_slide_animation,
 )
 
 # Import sub-agents
@@ -175,7 +175,7 @@ root_agent = Agent(
         finalize_slidecast_video,
         select_slidecast_style,
         generate_slide_animation_plan,
-        execute_slide_animation,
+        #execute_slide_animation,
         create_image_composite,
         run_production_test,
         get_public_url,
