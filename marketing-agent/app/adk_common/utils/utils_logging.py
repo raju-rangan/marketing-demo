@@ -22,10 +22,8 @@ import sys
 import time
 from typing import Optional
 
-from app.adk_common.utils.constants import (
-    get_optional_env_var,
-    get_required_env_var,
-)
+from google.adk.tools.tool_context import ToolContext
+from .constants import CONTEXT_UI_PREFIX, get_optional_env_var, get_required_env_var
 from google.genai import types
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
@@ -116,13 +114,16 @@ def sanitize_arg(arg):
     return res
 
 
-def log_status(message: str):
+def log_status(message: str, tool_context: Optional[ToolContext] = None):
     """Logs a status update that the UI can catch via stdout redirection.
     
     Args:
         message: The status message to display in the UI.
+        tool_context: Optional ToolContext to update the UI state.
     """
     print(f"ui:status_update {message}", flush=True)
+    if tool_context:
+        tool_context.state[CONTEXT_UI_PREFIX] = message
 
 
 def stream_status(start_message: str = "Working...", success_message: str = "Done.", error_message: str = "Error occurred"):
@@ -134,28 +135,36 @@ def stream_status(start_message: str = "Working...", success_message: str = "Don
         error_message: Message to show on exception.
     """
     def decorator(func):
+        # Helper to extract ToolContext from arguments
+        def get_tool_context(args, kwargs):
+            if args and isinstance(args[0], ToolContext):
+                return args[0]
+            return kwargs.get("tool_context")
+
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                log_status(start_message)
+                tool_context = get_tool_context(args, kwargs)
+                log_status(start_message, tool_context)
                 try:
                     result = await func(*args, **kwargs)
-                    log_status(success_message)
+                    log_status(success_message, tool_context)
                     return result
                 except Exception as e:
-                    log_status(f"{error_message}: {e}")
+                    log_status(f"{error_message}: {e}", tool_context)
                     raise
             return async_wrapper
         else:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                log_status(start_message)
+                tool_context = get_tool_context(args, kwargs)
+                log_status(start_message, tool_context)
                 try:
                     result = func(*args, **kwargs)
-                    log_status(success_message)
+                    log_status(success_message, tool_context)
                     return result
                 except Exception as e:
-                    log_status(f"{error_message}: {e}")
+                    log_status(f"{error_message}: {e}", tool_context)
                     raise
             return sync_wrapper
     return decorator

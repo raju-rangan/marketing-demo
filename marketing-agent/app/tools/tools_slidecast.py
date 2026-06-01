@@ -464,6 +464,10 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                 f"A STATIC, LOCKED-OFF CAMERA SHOT. The camera MUST NOT pan, tilt, zoom, or move in any way. "
                 f"The core layout, text, and composition MUST remain completely still and perfectly legible. "
                 f"Focus entirely on animating the EDUCATIONAL CONTENT on the screen using subtle, localized motion: "
+                f"Focus on animating the main subject on the slide (e.g., data lines, icons, characters) while keeping the overall slide layout and text perfectly static and readable. "
+                f"If main subject is a person animate them, if it's an infographic animate the data elements, if it's a diagram animate the connection arrows, etc. "
+                f"The motion should be smooth, purposeful, and directly tied to the script's narrative. "
+                f"Avoid any motion that would cause the viewer's eye to pan away from the core educational content or make text difficult to read. Examples of acceptable animations include: "
                 f"1. Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing. For graphs, show the growth of the line or bars from left to right or bottom to top, but keep the axes and labels perfectly still. "
                 f"2. Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process. "
                 f"3. Text & Highlights: Add a subtle sweeping sheen or soft illumination behind key bullet points or focus areas to draw the eye. "
@@ -685,7 +689,7 @@ async def execute_slide_animation(tool_context: ToolContext, animation_plan: dic
         
     final_media = GeneratedMedia(filename=f"nanomation_stitched_{int(time.time())}.mp4", mime_type="video/mp4", media_bytes=stitched_video)
     saved_final = await utils_agents.save_to_artifact_and_render_asset(
-        asset=final_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder
+        asset=final_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
     )
     
     return {

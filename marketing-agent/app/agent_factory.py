@@ -40,13 +40,13 @@ from .tools.tools_campaign import (
     save_selected_campaign,
     get_selected_brief,
 )
-from .tools.tools_media import (
-    generate_text_ad,
-    generate_display_ad,
-    generate_campaign_storyboard,
-    generate_video_from_storyboard,
-    create_image_composite,
-)
+# from .tools.tools_media import (
+    # generate_text_ad,
+    # generate_display_ad,
+    # generate_campaign_storyboard,
+    # generate_video_from_storyboard,
+    # create_image_composite,
+# )
 from .tools.tools_misc import (
     select_brand_preset,
     query_internal_knowledge_base,
@@ -159,10 +159,10 @@ root_agent = Agent(
         get_campaign_idea,
         save_selected_campaign,
         get_selected_brief,
-        generate_text_ad,
-        generate_display_ad,
-        generate_campaign_storyboard,
-        generate_video_from_storyboard,
+        # generate_text_ad,
+        # generate_display_ad,
+        # generate_campaign_storyboard,
+        # generate_video_from_storyboard,
         select_brand_preset,
         query_internal_knowledge_base,
         process_user_uploads,
@@ -176,7 +176,7 @@ root_agent = Agent(
         select_slidecast_style,
         generate_slide_animation_plan,
         #execute_slide_animation,
-        create_image_composite,
+        # create_image_composite,
         run_production_test,
         get_public_url,
         AgentTool(agent=trend_spotter_agent.agent),

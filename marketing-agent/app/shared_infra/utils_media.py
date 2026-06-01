@@ -252,7 +252,7 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
             log_message(f"Audio mixing failed: {e}", Severity.ERROR)
             return video_bytes
 
-def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.1) -> bytes:
+def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.0) -> bytes:
     """Overlays a logo in the bottom-right corner of the video."""
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")

@@ -34,13 +34,12 @@ from google.genai import types
 
 from ..dtos.generated_media import GeneratedMedia
 from . import utils_gcs
-from .constants import get_required_env_var
+from .constants import CONTEXT_UI_PREFIX, get_required_env_var
 from .utils_logging import Severity, log_function_call, log_message
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
 GOOGLE_CLOUD_BUCKET_ARTIFACTS = get_required_env_var("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
 
-CONTEXT_UI_PREFIX = "ui:status_update"
 SESSION_STATE_ID = "SESSION_STATE_ID"
 SESSION_ARTIFACTS_STATE_KEY = "SESSION_ARTIFACTS_STATE"
 TEMP_ARTIFACTS_STATE_KEY = "TEMP_ARTIFACTS_STATE"
@@ -458,6 +457,9 @@ async def save_to_artifact_and_render_asset(
         log_message(f"Saved file in GCS. URL: {asset.gcs_uri}. File size: {len(file)}. asset_name: {asset.filename}", Severity.INFO)
 
     store_inline_artifact_metadata(context, asset)
+
+    # Clear bytes to prevent them from being serialized in tool output/UI
+    asset.media_bytes = None
 
     return asset
 
