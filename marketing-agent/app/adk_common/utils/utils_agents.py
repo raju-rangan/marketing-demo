@@ -464,7 +464,9 @@ async def save_to_artifact_and_render_asset(
     return asset
 
 
-def store_inline_artifact_metadata(context: CallbackContext, asset: GeneratedMedia, add_to_temp: bool = False):
+def store_inline_artifact_metadata(context: CallbackContext, 
+                                   asset: GeneratedMedia, 
+                                   add_to_temp: bool = True) -> None:
     """Saves the asset metadata to the session state for inline retrieval.
 
     Args:
@@ -478,25 +480,24 @@ def store_inline_artifact_metadata(context: CallbackContext, asset: GeneratedMed
             "last_modified": datetime.now().isoformat()
         }
 
-         # Retrieve existing artifacts.
-        session_artifacts = context.state.get(SESSION_ARTIFACTS_STATE_KEY, {})
-        if not isinstance(session_artifacts, dict):
-            # Fallback if it was somehow initialized different than a dict
-            session_artifacts = {}
-
-        # Update or add the artifact entry
-        session_artifacts[asset.filename] = new_artifact_entry
-
-        # Save back to state
-        context.state[SESSION_ARTIFACTS_STATE_KEY] = session_artifacts
-
         if add_to_temp:
             temp_artifacts = context.state.get(f"{context.state.TEMP_PREFIX}{TEMP_ARTIFACTS_STATE_KEY}", {})
             if not isinstance(temp_artifacts, dict):
                 temp_artifacts = {}
             temp_artifacts[asset.filename] = new_artifact_entry
             context.state[f"{context.state.TEMP_PREFIX}{TEMP_ARTIFACTS_STATE_KEY}"] = temp_artifacts
+        else:
+             # Retrieve existing artifacts.
+            session_artifacts = context.state.get(SESSION_ARTIFACTS_STATE_KEY, {})
+            if not isinstance(session_artifacts, dict):
+                # Fallback if it was somehow initialized different than a dict
+                session_artifacts = {}
 
+            # Update or add the artifact entry
+            session_artifacts[asset.filename] = new_artifact_entry
+
+            # Save back to state
+            context.state[SESSION_ARTIFACTS_STATE_KEY] = session_artifacts
         log_message(f"Saved inline artifact metadata for: {asset.filename}", Severity.INFO)
     except Exception as e:
         log_message(f"WARNING: Failed to save inline artifact metadata: {e}", Severity.WARNING)

@@ -1,3 +1,8 @@
+---
+name: autopilot-pitch
+description: Provides workflow rules and instructions for autopilot pitch.
+---
+
 # EXECUTIVE DEMO (AUTOPILOT) Workflow
 
 If the user starts their message with the word **"Autopilot"** or requests a single-shot pitch (e.g., *"Autopilot: Pitch me a campaign"*), you MUST execute a single chained execution loop to deliver a jaw-dropping leadership pitch:

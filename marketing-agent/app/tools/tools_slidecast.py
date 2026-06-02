@@ -21,6 +21,7 @@ from ..state import (
     VOICEOVER_STYLES,
     CHOSEN_SLIDE_STYLE_STATE_KEY,
     CHOSEN_VOICEOVER_STYLE_STATE_KEY,
+    LLM_GEMINI_MODEL_MARKETING_ANALYST,
 )
 from ..utils.utils_gcs import get_public_url, set_output_folder
 from ..schema import SlidecastStoryboard, SlidecastSlide, NanomationPlan, NanomationPhase
@@ -94,36 +95,9 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
 
     return pdf.output()
 
-@stream_status("🔍 Researching and grounding insights from URLs...")
-def research_urls_to_report(tool_context: ToolContext, urls: List[str]) -> str:
-    """Researches a list of URLs using Gemini Search Grounding and creates a consolidated insight report."""
-    log_message(f"Starting research on {len(urls)} URLs...", Severity.INFO)
-    
-    url_list_str = "\n".join([f"- {url}" for url in urls])
-    prompt = (
-        f"Research the following URLs and synthesize a comprehensive educational report based on their content.\n"
-        f"Extract key insights, statistics, and best practices that would make for an engaging educational video.\n\n"
-        f"URLs to research:\n{url_list_str}\n\n"
-        f"Structure the report with clear headings, bullet points, and an executive summary."
-    )
-
-    try:
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-            ),
-        )
-        return response.text if response.text else "Failed to generate report from search."
-    except Exception as e:
-        log_message(f"Research failed: {e}", Severity.ERROR)
-        return f"Error during research: {e}"
-
 @stream_status("📋 Designing the educational storyboard...")
-def generate_slidecast_storyboard(tool_context: ToolContext, research_report: str, duration_seconds: int = 300, language: str = "English", aspect_ratio: str = "16:9") -> dict:
-    """Generates a SlidecastStoryboard (JSON) from a research report.
+def generate_slidecast_storyboard(tool_context: ToolContext, urls: List[str] = None, trend_context: str = "", duration_seconds: int = 300, language: str = "English", aspect_ratio: str = "16:9") -> dict:
+    """Generates a SlidecastStoryboard (JSON) directly grounded in the provided URLs.
     Dynamically scales slide count and pacing for short-form (Shorts) or long-form videos.
     """
     # Fail-safe: Ensure brand identity is loaded
@@ -150,56 +124,109 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
         
     words_per_slide = max(10, total_word_target // num_slides)
     
-    selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY, "Flat Vector Explainer")
-    style_desc = SLIDE_STYLES.get(selected_style_name, SLIDE_STYLES["Flat Vector Explainer"])
+    selected_style_name = tool_context.state.get(CHOSEN_SLIDE_STYLE_STATE_KEY)
+    if not selected_style_name:
+        return {
+            "status": "error", 
+            "message": "Visual style not set. You MUST present the available styles to the user and call `select_slidecast_style` to lock in their choice BEFORE generating the storyboard."
+        }
+        
+    style_desc = SLIDE_STYLES.get(selected_style_name)
 
     branding_directive = f"3. BRANDING: Use {company_name}'s color palette for all designs."
     if brand_guidelines:
         branding_directive += f" Follow these strict brand guidelines: {brand_guidelines[:2000]}"
 
-    prompt = (
-        f"You are an expert Lead Educational Producer for {company_name}.\n"
-        f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast' in {language}.\n\n"
-        f"LANGUAGE REQUIREMENT:\n"
-        f"- ALL NARRATION SCRIPTS MUST BE WRITTEN IN {language}.\n"
-        f"- ALL VISUAL TEXT (titles, labels, infographic text) DESCRIBED IN IMAGE PROMPTS MUST BE WRITTEN IN {language}.\n"
-        f"- Use formal, professional {language} appropriate for an executive educational video.\n\n"
-        f"STRUCTURE REQUIREMENTS:\n"
-        f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic in {language} and a welcoming, high-level introduction narration in {language}.\n"
-        f"- FINAL SLIDE MUST BE A SUMMARY/CONCLUSION SLIDE: It must summarize the key takeaways in a logical manner and bring the presentation to a smooth, definitive close, avoiding any abrupt endings. If the article has an existing conclusion or summary, use that.\n"
-        f"- TOTAL SLIDES: {num_slides} slides total.\n"
-        f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt.\n\n"
-        f"DURATION & WORD COUNT TARGETS:\n"
-        f"- Target Duration: {duration_minutes} minutes.\n"
-        f"- Total Word Count: ~{total_word_target} words (speaking rate: 160 WPM).\n"
-        f"- Target per slide: ~{words_per_slide} words of detailed narration.\n\n"
-        f"CORE DIRECTIVES:\n"
-        f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
-        f"2. NARRATION & GROUNDING: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. The narrative MUST be strictly grounded in the provided Research Report and original articles. Do not include external facts, unverified claims, or information not present in the original research. Do NOT be concise.\n"
-        f"3. BRANDING: {branding_directive}\n"
-        f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
-        f"Research Report:\n{research_report}\n\n"
-        f"Output ONLY valid JSON matching this schema:\n"
-        f"{{\n"
-        f"  \"title\": \"Comprehensive Title in {language}\",\n"
-        f"  \"summary_arc\": [\"[High-level phase 1]\", \"[High-level phase 2]\", ...],\n"
-        f"  \"slides\": [\n"
-        f"    {{\n"
-        f"      \"slide_title\": \"[Concise Slide Title]\",\n"
-        f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography in {language}. Include logo in bottom right. ALL text on the slide MUST be in {language}.]\",\n"
-        f"      \"script\": \"[Introductory narration in {language} of approx {words_per_slide} words...]\",\n"
-        f"      \"text_overlay\": \"\" \n"
-        f"    }},\n"
-        f"    {{\n"
-        f"      \"slide_title\": \"[Concise Slide Title]\",\n"
-        f"      \"image_prompt\": \"[Infographic layout with data and labels in {language}. Include logo in bottom right...]\",\n"
-        f"      \"script\": \"[Detailed educational narration in {language}...]\",\n"
-        f"      \"text_overlay\": \"\" \n"
-        f"    }}\n"
-        f"  ],\n"
-        f"  \"music_prompt\": \"Sophisticated, cinematic educational background music\"\n"
-        f"}}"
-    )
+    url_list_str = "\n".join([f"- {url}" for url in urls]) if urls else "No specific URLs provided."
+
+    if aspect_ratio == "9:16":
+        # VIRAL SHORTS PROMPT
+        prompt = (
+            f"You are an expert Social Media Producer for {company_name}, specializing in high-retention viral Shorts (TikTok/Reels format).\n"
+            f"Goal: Create a fast-paced, high-energy storyboard for a {duration_seconds}-second vertical video (9:16) in {language}.\n\n"
+            f"SOURCE MATERIAL:\n"
+            f"Extract the most compelling, counter-intuitive, or highest-value hooks from these URLs:\n"
+            f"{url_list_str}\n\n"
+            f"TREND CONTEXT (Use to shape the hook):\n"
+            f"{trend_context}\n\n"
+            f"STRUCTURE REQUIREMENTS (CRITICAL FOR SHORTS):\n"
+            f"- SLIDE 1 MUST BE THE HOOK: NO title slides. NO \"Welcome to...\" intros. Start immediately with a high-stakes question, shocking claim, or curiosity gap.\n"
+            f"- RETENTION: Every 3-5 seconds (each slide) must introduce a pattern interrupt. Use punchy, fast-paced dialogue.\n"
+            f"- THE CTA: The final slide must have an abrupt, direct call to action. Do NOT use formal corporate summaries.\n"
+            f"- TOTAL SCENES: {num_slides} distinct visual scenes/cuts.\n"
+            f"- TARGET WORD COUNT: ~{total_word_target} words total (extremely fast speaking rate).\n\n"
+            f"CORE DIRECTIVES:\n"
+            f"1. KINETIC VISUALS: Every image prompt must describe a highly dynamic vertical scene. Think 'creator-style' angles, bold close-ups, or striking visual metaphors. Avoid dense, tiny corporate infographics that won't read on a phone.\n"
+            f"2. KINETIC TEXT: Use the 'text_overlay' field to specify 1-3 massive, punchy words that should pop on screen for that slide. ALL TEXT MUST BE IN {language}.\n"
+            f"3. NARRATION: Write conversational, punchy scripts in {language}. Ground them in the URLs, but translate them into creator-speak.\n"
+            f"4. BRANDING: {branding_directive} Note: Keep logos subtle and out of the middle 60% safe zone.\n"
+            f"5. VISUAL STYLE: {style_desc}\n\n"
+            f"Output ONLY valid JSON matching this schema:\n"
+            f"{{\n"
+            f"  \"title\": \"[Viral Hook Title]\",\n"
+            f"  \"summary_arc\": [\"Hook\", \"Value Bomb 1\", \"Value Bomb 2\", \"Direct CTA\"],\n"
+            f"  \"slides\": [\n"
+            f"    {{\n"
+            f"      \"slide_title\": \"Hook\",\n"
+            f"      \"image_prompt\": \"[Dynamic, close-up vertical scene... No text in prompt.]\",\n"
+            f"      \"script\": \"[Fast, shocking opening sentence...]\",\n"
+            f"      \"text_overlay\": \"[1-3 massive bold words, e.g., 'STOP DOING THIS']\" \n"
+            f"    }}\n"
+            f"  ],\n"
+            f"  \"music_prompt\": \"High-energy, fast-tempo, modern viral social media beat\"\n"
+            f"}}"
+        )
+    else:
+        # LONG-FORM SLIDECAST PROMPT (16:9)
+        prompt = (
+            f"You are an expert Lead Educational Producer for {company_name}.\n"
+            f"Goal: Create a MASTER PLAN for a {duration_minutes}-minute in-depth educational 'Slidecast' in {language} (16:9 format).\n\n"
+            f"SOURCE MATERIAL:\n"
+            f"Research the following URLs to gather the factual content for this presentation:\n"
+            f"{url_list_str}\n\n"
+            f"TREND CONTEXT:\n"
+            f"Use the following market trends to subtly inform the narrative tone and hooks, but DO NOT invent facts:\n"
+            f"{trend_context}\n\n"
+            f"LANGUAGE REQUIREMENT:\n"
+            f"- ALL NARRATION SCRIPTS MUST BE WRITTEN IN {language}.\n"
+            f"- ALL VISUAL TEXT (titles, labels, infographic text) DESCRIBED IN IMAGE PROMPTS MUST BE WRITTEN IN {language}.\n"
+            f"- Use formal, professional {language} appropriate for an executive educational video.\n\n"
+            f"STRUCTURE REQUIREMENTS:\n"
+            f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic in {language} and a welcoming, high-level introduction narration in {language}.\n"
+            f"- FINAL SLIDE MUST BE A SUMMARY/CONCLUSION SLIDE: It must summarize the key takeaways in a logical manner and bring the presentation to a smooth, definitive close, avoiding any abrupt endings. If the article has an existing conclusion or summary, use that.\n"
+            f"- TOTAL SLIDES: {num_slides} slides total.\n"
+            f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt.\n\n"
+            f"DURATION & WORD COUNT TARGETS:\n"
+            f"- Target Duration: {duration_minutes} minutes.\n"
+            f"- Total Word Count: ~{total_word_target} words (speaking rate: 160 WPM).\n"
+            f"- Target per slide: ~{words_per_slide} words of detailed narration.\n\n"
+            f"CORE DIRECTIVES:\n"
+            f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
+            f"2. NARRATION & GROUNDING: Each voiceover script MUST be a detailed educational segment (~{words_per_slide} words) written in {language}. The narrative MUST be strictly grounded in the content of the provided URLs. Do not include external facts, unverified claims, or information not present in the original research. Do NOT be concise.\n"
+            f"3. BRANDING: {branding_directive}\n"
+            f"4. VISUAL STYLE: {style_desc} NO style variations across slides. Avoid overly metallic or glossy surfaces unless the prompt specifically requires a technological detail.\n\n"
+            f"Output ONLY valid JSON matching this schema:\n"
+            f"{{\n"
+            f"  \"title\": \"Comprehensive Title in {language}\",\n"
+            f"  \"summary_arc\": [\"[High-level phase 1]\", \"[High-level phase 2]\", ...],\n"
+            f"  \"slides\": [\n"
+            f"    {{\n"
+            f"      \"slide_title\": \"[Concise Slide Title]\",\n"
+            f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography in {language}. Include logo in bottom right. ALL text on the slide MUST be in {language}.]\",\n"
+            f"      \"script\": \"[Introductory narration in {language} of approx {words_per_slide} words...]\",\n"
+            f"      \"text_overlay\": \"\" \n"
+            f"    }},\n"
+            f"    {{\n"
+            f"      \"slide_title\": \"[Concise Slide Title]\",\n"
+            f"      \"image_prompt\": \"[Infographic layout with data and labels in {language}. Include logo in bottom right...]\",\n"
+            f"      \"script\": \"[Detailed educational narration in {language}...]\",\n"
+            f"      \"text_overlay\": \"\" \n"
+            f"    }}\n"
+            f"  ],\n"
+            f"  \"music_prompt\": \"Sophisticated, cinematic educational background music\"\n"
+            f"}}"
+        )
+
     try:
         response = client.models.generate_content(
             model="gemini-3.1-pro-preview",
@@ -207,6 +234,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, research_report: st
             config=types.GenerateContentConfig(
                 temperature=0.7,
                 response_mime_type="application/json",
+                tools=[types.Tool(google_search=types.GoogleSearch())] if urls else None,
             ),
         )
 
@@ -294,6 +322,61 @@ def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_in
     except Exception as e:
         log_message(f"Slide update failed: {e}", Severity.ERROR)
         return {"status": "error", "details": str(e)}
+
+def update_storyboard_visual_style(tool_context: ToolContext, storyboard: dict, new_style_name: str) -> dict:
+    """Updates the visual style of an entire storyboard by rewriting ONLY the image prompts to match a new style.
+    Leaves all narrative scripts perfectly untouched.
+    """
+    log_message(f"Updating overall storyboard visual style to: {new_style_name}...", Severity.INFO)
+    
+    try:
+        sb = SlidecastStoryboard.model_validate(storyboard)
+    except Exception as e:
+        return {"status": "error", "details": f"Invalid storyboard format: {e}"}
+
+    company_name = tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY, "Brand")
+    style_desc = SLIDE_STYLES.get(new_style_name, new_style_name)
+
+    # 1. Update the stored style preference so future renders use it
+    tool_context.state[CHOSEN_SLIDE_STYLE_STATE_KEY] = new_style_name
+
+    # 2. Iterate through slides and use LLM to rewrite the image_prompt
+    for i, slide in enumerate(sb.slides):
+        log_message(f"Rewriting image prompt for slide {i+1} to match new style...", Severity.INFO)
+        prompt = (
+            f"You are a Senior Art Director for {company_name}.\n"
+            f"We are transitioning a slidecast to a new visual style: {new_style_name}.\n"
+            f"Style Description: {style_desc}\n\n"
+            f"CURRENT IMAGE PROMPT:\n{slide.image_prompt}\n\n"
+            f"CURRENT NARRATION SCRIPT (For context only):\n{slide.script}\n\n"
+            f"TASK:\n"
+            f"Rewrite the CURRENT IMAGE PROMPT so that it perfectly aligns with the new visual style. "
+            f"Ensure the new image prompt still describes a scene that makes sense with the narration script, and still includes the {company_name} logo in the bottom right corner.\n\n"
+            f"Output ONLY the new raw image prompt string, nothing else. No quotes, no JSON."
+        )
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.1-pro-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                ),
+            )
+            
+            if response.text:
+                slide.image_prompt = response.text.strip()
+                # Clear ONLY the visual assets so they are regenerated, keeping audio intact
+                slide.image_url = None
+                slide.video_url = None
+        except Exception as e:
+            log_message(f"Failed to update image prompt for slide {i+1}: {e}", Severity.WARNING)
+
+    return {
+        "status": "success",
+        "message": f"Visual style successfully updated to '{new_style_name}'. Image prompts rewritten. Narrative scripts were kept identical.",
+        "storyboard": sb.model_dump()
+    }
 
 @stream_status("🎨 Generating branded slide assets and narration...")
 async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) -> dict:
@@ -458,25 +541,87 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         # 2. Generate animation if missing
         if not video_bytes and animate_slides:
             log_message(f"Animating slide {idx+1} with Veo...", Severity.INFO)
-            # STRICTly constrain Veo to prevent the slide layout/text from panning off screen.
-            # Focuses on diverse animations, character actions driven by script, and strict text preservation.
-            motion_prompt = (
-                f"A STATIC, LOCKED-OFF CAMERA SHOT. The camera MUST NOT pan, tilt, zoom, or move in any way. "
-                f"The core layout, text, and composition MUST remain completely still and perfectly legible. "
-                f"Focus entirely on animating the EDUCATIONAL CONTENT on the screen using subtle, localized motion: "
-                f"Focus on animating the main subject on the slide (e.g., data lines, icons, characters) while keeping the overall slide layout and text perfectly static and readable. "
-                f"If main subject is a person animate them, if it's an infographic animate the data elements, if it's a diagram animate the connection arrows, etc. "
-                f"The motion should be smooth, purposeful, and directly tied to the script's narrative. "
-                f"Avoid any motion that would cause the viewer's eye to pan away from the core educational content or make text difficult to read. Examples of acceptable animations include: "
-                f"1. Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing. For graphs, show the growth of the line or bars from left to right or bottom to top, but keep the axes and labels perfectly still. "
-                f"2. Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process. "
-                f"3. Text & Highlights: Add a subtle sweeping sheen or soft illumination behind key bullet points or focus areas to draw the eye. "
-                f"4. Icons & Spot illustrations: Give educational icons gentle, localized cinemagraph-style motion (e.g., a globe slowly spinning, a gear slowly turning). "
-                f"5. If there are people, or characters in the infographic, animate them with slow, purposeful actions that directly reflect the script (e.g., a person icon walking slowly when the script mentions 'progress' or 'movement')."
-                f"6. Simulate vehicle movement by keeping the vehicle in place but animating the wheels and adding subtle motion blur to imply movement, without actually moving the vehicle off its original position."
-                f"7. TEXT PRESERVATION IS ABSOLUTE: DO NOT add, alter, morph, or hallucinate any text. All text MUST remain completely frozen and perfectly readable. "
-                f"Keep all motion subtle, professional, and strictly constrained to the data/content elements without altering the slide layout." 
-            )
+            
+            # Use Gemini to pick the best animation from the approved menu
+            if sb.aspect_ratio == "9:16":
+                # SHORTS: Dynamic, high-energy, camera movement allowed
+                llm_prompt = (
+                    "You are an expert video prompt engineer for viral social media content (Shorts/Reels).\n"
+                    "Your task is to generate a specific, highly controlled visual description for a video generation AI based on a provided script or slide.\n\n"
+                    "CONSTRAINTS (DO NOT VIOLATE):\n"
+                    "CAMERA: Focus on dynamic energy. Add slow cinematic push-ins (zooms), dramatic pans, or expressive character motion. Text preservation is important but secondary to visual impact.\n"
+                    "SAFETY: All motion must be professional and educational. Do not generate chaotic, rapid, derogatory, or destructive motion (e.g., no crashes, no explosions). Frame all descriptions positively.\n\n"
+                    "YOUR OUTPUT:\n"
+                    "Based on the provided slide/script, you will ONLY output the two variables needed for the final video generation. Keep your descriptions highly visual and physical.\n"
+                    "Output ONLY valid JSON matching this schema:\n"
+                    "{\n"
+                    "  \"scene_subject\": \"[Describe the specific static layout]\",\n"
+                    "  \"approved_animation\": \"[Describe the dynamic motion, e.g., 'A slow cinematic push-in while the main character animatedly points to the data.']\"\n"
+                    "}\n\n"
+                    f"Slide Image Description: {slide.image_prompt}\n"
+                    f"Slide Script: {slide.script}"
+                )
+            else:
+                # LONG-FORM (16:9): Strict corporate governance, locked camera
+                llm_prompt = (
+                    "You are an expert video prompt engineer for corporate educational content. Your task is to generate a specific, highly controlled visual description for a video generation AI based on a provided script or slide.\n\n"
+                    "CORPORATE GUIDELINES & CONSTRAINTS (DO NOT VIOLATE):\n"
+                    "CAMERA: The camera MUST NEVER pan, tilt, zoom, or move.\n"
+                    "TEXT: TEXT PRESERVATION IS ABSOLUTE. Do not add, animate, morph, or alter text or core slide layouts.\n"
+                    "SAFETY: All motion must be professional and educational. Do not generate chaotic, rapid, derogatory, or destructive motion (e.g., no crashes, no explosions). Frame all descriptions positively (e.g., \"calm and controlled\").\n"
+                    "MOTION STYLE: Focus entirely on subtle, localized \"cinemagraph\" motion tied to the narrative.\n\n"
+                    "APPROVED ANIMATION LIBRARY:\n"
+                    "You must select and adapt the animation style based on the subject matter:\n"
+                    "If Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing from left-to-right or bottom-to-top.\n"
+                    "If Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process.\n"
+                    "If Text & Highlights: Add a subtle sweeping metallic sheen or soft illumination behind key bullet points to draw the eye.\n"
+                    "If Icons & Spot Illustrations: Give elements gentle, localized motion (e.g., a globe slowly spinning, a gear slowly rotating on its Y-axis, or a gentle hovering loop).\n"
+                    "If Characters/People: Animate them with slow, fluid, purposeful actions that directly reflect the script while maintaining a professional demeanor.\n"
+                    "If Vehicles: Keep the vehicle locked in its original position, animate the wheels rotating, and add a subtle, slow-moving horizontal background blur to imply forward motion.\n\n"
+                    "YOUR OUTPUT:\n"
+                    "Based on the provided slide/script, you will ONLY output the two variables needed for the final video generation. Keep your descriptions highly visual and physical.\n"
+                    "Output ONLY valid JSON matching this schema:\n"
+                    "{\n"
+                    "  \"scene_subject\": \"[Describe the specific static layout, e.g., 'A clean, 3D isometric infographic showing a 3-step supply chain workflow on a navy blue background.']\",\n"
+                    "  \"approved_animation\": \"[Describe the specific motion using the Approved Library, e.g., 'A soft pulse of luminescent light travels continuously along the connection arrows from the factory node to the store node.']\"\n"
+                    "}\n\n"
+                    f"Slide Image Description: {slide.image_prompt}\n"
+                    f"Slide Script: {slide.script}"
+                )
+            
+            try:
+                def _call_llm():
+                    return client.models.generate_content(
+                        model=LLM_GEMINI_MODEL_MARKETING_ANALYST,
+                        contents=llm_prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=0.7,
+                            response_mime_type="application/json"
+                        )
+                    )
+                resp = await asyncio.to_thread(_call_llm)
+                llm_response = json.loads(resp.text)
+                
+                scene_subject = llm_response.get("scene_subject", slide.image_prompt)
+                approved_animation = llm_response.get("approved_animation", "A subtle, slow-moving metallic light sweep passes behind the key elements.")
+            except Exception as e:
+                log_message(f"Failed to generate specific motion prompt for slide {idx+1}: {e}", Severity.WARNING)
+                scene_subject = slide.image_prompt
+                approved_animation = "A subtle, slow-moving metallic light sweep passes behind the key elements."
+            
+            if sb.aspect_ratio == "9:16":
+                motion_prompt = (
+                    f"Dynamic, high-energy cinematic camera movement. "
+                    f"{scene_subject}. {approved_animation}. "
+                    f"Smooth but bold motion suitable for viral social media. Rich, dramatic lighting and expressive action. No chaotic, rapid, or distracting movement."
+                )
+            else:
+                motion_prompt = (
+                    f"Static, locked-off camera shot, deep focus, cinemagraph style. Professional corporate educational presentation. "
+                    f"{scene_subject}. {approved_animation}. "
+                    f"The core layout, typography, and background composition remain completely frozen in place, preserving absolute text legibility without morphing. Motion is strictly localized, subtle, fluid, and purposeful. The environment is calm, pristine, and highly controlled. No chaotic, rapid, or distracting movement."
+                )
+
             video_bytes = await _generate_single_veo_clip(
                 prompt=motion_prompt, 
                 start_frame_gcs_uri=slide.image_url, 
@@ -558,7 +703,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         "details": "Slidecast masterclass finalized and ready for viewing."
     }
 
-def select_slidecast_style(tool_context: ToolContext, slide_style: str = "Clean Corporate", voiceover_style: str = "Energetic & Engaging") -> dict:
+def select_slidecast_style(tool_context: ToolContext, slide_style: str, voiceover_style: str) -> dict:
     """Sets the visual and vocal style for the upcoming Slidecast.
     
     Args:

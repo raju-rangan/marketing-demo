@@ -174,14 +174,19 @@ def _get_image_mime_type(data: bytes) -> str:
     return "image/png"
 
 async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image", aspect_ratio: str = None) -> bytes | None:
+    # Append a strict directive to prevent prompt instructions from bleeding into the image text
+    safe_prompt = prompt + (
+        "\n\nCRITICAL NEGATIVE DIRECTIVE: Do NOT render any of my stylistic, formatting, or layout instructions (e.g., 'mobile first typography', 'extreme readability', 'centered', 'bold claim') as literal text in the image. Any text in the image MUST ONLY be the actual educational content, titles, or data labels. Never write metadata or instructions on the canvas."
+    )
+    
     # 📸 High-visibility logging for Image Generation
     log_message(f"🖼️ [`IMAGE GEN ARGS]` Label: {label} | Aspect Ratio: {aspect_ratio}", Severity.INFO)
-    log_message(f"📝 [IMAGE GEN PROMPT]: {prompt}", Severity.INFO)
+    log_message(f"📝 [IMAGE GEN PROMPT]: {safe_prompt}", Severity.INFO)
     
     log_message(f"📎 [IMAGE GEN REFS]: {len(reference_images)} images attached", Severity.INFO)
 
     parts = [types.Part.from_bytes(data=img, mime_type=_get_image_mime_type(img)) for img in reference_images if img]
-    parts.append(types.Part.from_text(text=prompt))
+    parts.append(types.Part.from_text(text=safe_prompt))
 
     contents = [types.Content(role="user", parts=parts)]
 

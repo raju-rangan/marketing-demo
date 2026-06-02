@@ -34,41 +34,27 @@ from .state import (
 from .utils.utils_gcs import get_public_url
 
 # Import tools
-from .tools.tools_campaign import (
-    setup_product_campaign,
-    get_campaign_idea,
-    save_selected_campaign,
-    get_selected_brief,
-)
-# from .tools.tools_media import (
-    # generate_text_ad,
-    # generate_display_ad,
-    # generate_campaign_storyboard,
-    # generate_video_from_storyboard,
-    # create_image_composite,
+# from .tools.tools_campaign import (
+#     # setup_product_campaign,
+#     # get_selected_brief,
 # )
 from .tools.tools_misc import (
     select_brand_preset,
     query_internal_knowledge_base,
     process_user_uploads,
-    rename_asset_tag,
-    deploy_react_website,
     run_production_test,
+    search_trends,
 )
 
 from .tools.tools_slidecast import (
-    research_urls_to_report,
     generate_slidecast_storyboard,
     update_slidecast_slide,
+    update_storyboard_visual_style,
     preview_slidecast_assets,
     finalize_slidecast_video,
     select_slidecast_style,
     generate_slide_animation_plan,
-    #execute_slide_animation,
 )
-
-# Import sub-agents
-from .sub_agents.trend_spotter import TrendSpotter
 
 # ============================================================
 # Dynamic Instruction Provider
@@ -134,11 +120,11 @@ _SKILLS_DIR = os.path.join(os.path.dirname(__file__), "skills")
 
 marketing_skills = SkillToolset(
     skills=[
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "ad-copywriting")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "video-storytelling")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "financial-marketing")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "website-design")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "slide-design")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "slidecast-production")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "shorts-production")),
+        # load_skill_from_dir(os.path.join(_SKILLS_DIR, "nanomation")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "trend-analysis")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "autopilot-pitch")),
     ],
 )
 
@@ -146,40 +132,28 @@ marketing_skills = SkillToolset(
 # Root Agent Definition
 # ============================================================
 
-trend_spotter_agent = TrendSpotter()
-
 root_agent = Agent(
     name="marketing_agent",
     model=Gemini(model="gemini-3-flash-preview"),
     instruction=_dynamic_instruction_provider,
-    description="Generic Marketing Campaign Agent. Handles ideation, creative direction, and media generation.",
+    description="Video-Focused Marketing Agent. Handles long-form Slidecasts and short-form video generation.",
     tools=[
         marketing_skills,
-        setup_product_campaign,
-        get_campaign_idea,
-        save_selected_campaign,
-        get_selected_brief,
-        # generate_text_ad,
-        # generate_display_ad,
-        # generate_campaign_storyboard,
-        # generate_video_from_storyboard,
+        # setup_product_campaign,
+        # get_selected_brief,
         select_brand_preset,
         query_internal_knowledge_base,
         process_user_uploads,
-        rename_asset_tag,
-        deploy_react_website,
-        research_urls_to_report,
+        run_production_test,
+        get_public_url,
+        search_trends,
         generate_slidecast_storyboard,
         update_slidecast_slide,
+        update_storyboard_visual_style,
         preview_slidecast_assets,
         finalize_slidecast_video,
         select_slidecast_style,
         generate_slide_animation_plan,
-        #execute_slide_animation,
-        # create_image_composite,
-        run_production_test,
-        get_public_url,
-        AgentTool(agent=trend_spotter_agent.agent),
     ],
 )
 

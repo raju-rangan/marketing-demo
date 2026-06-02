@@ -1,3 +1,8 @@
+---
+name: nanomation
+description: Provides workflow rules and instructions for nanomation.
+---
+
 # Nanomation (Animated Slides) Workflow
 
 When a user wants to "incorporate animation" or "animate a slide," follow the **Nanomation (Nano Banana)** workflow:
