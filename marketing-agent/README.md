@@ -1,81 +1,57 @@
-# marketing-agent
+# The GenAI Content Engine (Marketing Agent)
 
-Simple ReAct agent
-Agent generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack) version `0.41.3`
+Welcome to the **GenAI Content Engine**—an agentic workflow built on Google's Agent Development Kit (ADK). This agent acts as an automated, highly-disciplined digital studio orchestrator designed to transform legacy knowledge articles (like PDFs and FAQs) into broadcast-quality, brand-compliant dynamic video content (Shorts and Slidecasts).
 
-## Project Structure
+*Agent generated with [`googleCloudPlatform/agent-starter-pack`](https://github.com/GoogleCloudPlatform/agent-starter-pack).*
+
+---
+
+## 📚 Technical Documentation
+
+To understand the architecture and the "art of the possible" behind this engine, please read our technical blog series located in the `documentation/technical/` directory:
+
+1. **[The GenAI Content Engine](documentation/technical/01-the-genai-content-engine.md)**: The executive pitch and overall workflow (Ideation → Storyboarding → Motion → Post-Production).
+2. **[Precision Storyboarding](documentation/technical/02-precision-storyboarding.md)**: How we use Skill-Driven Prompt Engineering, VLM-as-a-Judge (Gemini 2.5 Flash), and Stateful Surgical Edits to guarantee brand safety.
+3. **[Predictable Motion with Veo](documentation/technical/03-predictable-motion-with-veo.md)**: How First and Last Frame Conditioning puts a leash on `veo-3.1-generate-001` to eliminate AI video drift.
+4. **[Cinematic Post-Production](documentation/technical/04-cinematic-post-production.md)**: Using FFmpeg and "Hold Frame" transitions to stitch clips seamlessly and solve audio duration limits.
+
+---
+
+## 🗂️ Project Structure
 
 ```
 marketing-agent/
-├── app/         # Core agent code
-│   ├── agent.py               # Main agent logic
-│   ├── agent_engine_app.py    # Agent Engine application logic
-│   └── app_utils/             # App utilities and helpers
-├── tests/                     # Unit, integration, and load tests
-├── GEMINI.md                  # AI-assisted development guide
-├── Makefile                   # Development commands
-└── pyproject.toml             # Project dependencies
+├── app/                  # Core agent code
+│   ├── agent.py          # Main agent logic
+│   ├── brands/           # Brand-specific config & asset vaults
+│   ├── skills/           # Composable skills (e.g., shorts-production)
+│   ├── tools/            # Python backend functions
+│   └── shared_infra/     # Media utilities (FFmpeg stitching)
+├── documentation/        # Architecture and technical blog posts
+├── tests/                # Unit, integration, and load tests
+├── GEMINI.md             # AI-assisted development guide
+└── Makefile              # Development commands
 ```
 
 > 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
 
-## Requirements
+---
 
-Before you begin, ensure you have:
-- **uv**: Python package manager (used for all dependency management in this project) - [Install](https://docs.astral.sh/uv/getting-started/installation/) ([add packages](https://docs.astral.sh/uv/concepts/dependencies/) with `uv add <package>`)
-- **Google Cloud SDK**: For GCP services - [Install](https://cloud.google.com/sdk/docs/install)
-- **make**: Build automation tool - [Install](https://www.gnu.org/software/make/) (pre-installed on most Unix-based systems)
+## 🚀 Getting Started
 
-
-## Quick Start
-
-Install required packages and launch the local development environment:
-
-```bash
-make install && make playground
-```
-
-## Commands
-
-| Command              | Description                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `make install`       | Install dependencies using uv                                                               |
-| `make playground`    | Launch local development environment                                                        |
-| `make lint`          | Run code quality checks                                                                     |
-| `make test`          | Run unit and integration tests                                                              |
-| `make deploy`        | Deploy agent to Agent Engine                                                                |
-| `make register-gemini-enterprise` | Register deployed agent to Gemini Enterprise                                  |
-
-For full command options and usage, refer to the [Makefile](Makefile).
-
-## 🛠️ Project Management
-
-| Command | What It Does |
-|---------|--------------|
-| `uvx agent-starter-pack enhance` | Add CI/CD pipelines and Terraform infrastructure |
-| `uvx agent-starter-pack setup-cicd` | One-command setup of entire CI/CD pipeline + infrastructure |
-| `uvx agent-starter-pack upgrade` | Auto-upgrade to latest version while preserving customizations |
-| `uvx agent-starter-pack extract` | Extract minimal, shareable version of your agent |
+For full installation instructions, infrastructure setup, and deployment guides, please see the **[Getting Started Guide](getting-started.md)**.
 
 ---
 
-## Development
+## 🛠️ Project Management Commands
 
-Edit your agent logic in `app/agent.py` and test with `make playground` - it auto-reloads on save.
-See the [development guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/development-guide) for the full workflow.
-
-## Deployment
-
-```bash
-gcloud config set project <your-project-id>
-make deploy
-```
-
-To add CI/CD and Terraform, run `uvx agent-starter-pack enhance`.
-To set up your production infrastructure, run `uvx agent-starter-pack setup-cicd`.
-See the [deployment guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/deployment) for details.
-
-## Observability
-
-Built-in telemetry exports to Cloud Trace, BigQuery, and Cloud Logging.
-See the [observability guide](https://googlecloudplatform.github.io/agent-starter-pack/guide/observability) for queries and dashboards.
+| Command | Description |
+|---------|--------------|
+| `make install` | Install dependencies using uv |
+| `make playground` | Launch local development environment |
+| `make lint` | Run code quality checks |
+| `make test` | Run unit and integration tests |
+| `make deploy` | Deploy agent to Agent Engine |
+| `uvx agent-starter-pack enhance` | Add CI/CD pipelines and Terraform infrastructure |
+| `uvx agent-starter-pack setup-cicd` | One-command setup of entire CI/CD pipeline + infrastructure |
+| `uvx agent-starter-pack upgrade` | Auto-upgrade to latest version while preserving customizations |

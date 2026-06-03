@@ -2,6 +2,13 @@
 
 This guide will walk you through the process of bootstrapping your local environment, setting up a new brand, testing it locally in the playground, deploying the agent to Google Cloud, and registering it with Gemini Enterprise.
 
+### Requirements
+
+Before you begin, ensure you have:
+- **uv**: Python package manager - [Install](https://docs.astral.sh/uv/getting-started/installation/)
+- **Google Cloud SDK**: For GCP services - [Install](https://cloud.google.com/sdk/docs/install)
+- **make**: Build automation tool - (Pre-installed on most Unix-based systems)
+
 ## 1. Initial Setup & Infrastructure
 
 Before you can create a brand or run the playground, you must authenticate and bootstrap your Google Cloud infrastructure (like creating the artifact storage bucket).

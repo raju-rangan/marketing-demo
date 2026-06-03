@@ -210,3 +210,4 @@ tools/a2a-inspector/
 
 # Brand configurations
 app/brands/
+plan_artifact/
