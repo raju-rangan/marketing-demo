@@ -174,14 +174,19 @@ def _get_image_mime_type(data: bytes) -> str:
     return "image/png"
 
 async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image", aspect_ratio: str = None) -> bytes | None:
+    # Append a strict directive to prevent prompt instructions from bleeding into the image text
+    safe_prompt = prompt + (
+        "\n\nCRITICAL NEGATIVE DIRECTIVE: Do NOT render any of my stylistic, formatting, or layout instructions (e.g., 'mobile first typography', 'extreme readability', 'centered', 'bold claim') as literal text in the image. Any text in the image MUST ONLY be the actual educational content, titles, or data labels. Never write metadata or instructions on the canvas."
+    )
+    
     # 📸 High-visibility logging for Image Generation
     log_message(f"🖼️ [`IMAGE GEN ARGS]` Label: {label} | Aspect Ratio: {aspect_ratio}", Severity.INFO)
-    log_message(f"📝 [IMAGE GEN PROMPT]: {prompt}", Severity.INFO)
+    log_message(f"📝 [IMAGE GEN PROMPT]: {safe_prompt}", Severity.INFO)
     
     log_message(f"📎 [IMAGE GEN REFS]: {len(reference_images)} images attached", Severity.INFO)
 
     parts = [types.Part.from_bytes(data=img, mime_type=_get_image_mime_type(img)) for img in reference_images if img]
-    parts.append(types.Part.from_text(text=prompt))
+    parts.append(types.Part.from_text(text=safe_prompt))
 
     contents = [types.Content(role="user", parts=parts)]
 
@@ -227,12 +232,13 @@ def _sanitize_veo_prompt(prompt: str) -> str:
 
 async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
                                      clip_duration: int = 6, end_frame_gcs_uri: str | None = None,
-                                     label: str = "clip") -> bytes | None:
+                                     label: str = "clip", aspect_ratio: str = "16:9") -> bytes | None:
     """Generates a single VEO video clip using the source's operation polling pipeline."""
     # 🎬 High-visibility logging for Video Generation
     log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s", Severity.INFO)
     log_message(f"📝 [VEO GEN PROMPT]: {prompt}", Severity.INFO)
     log_message(f"🖼️ [VEO GEN START FRAME]: {start_frame_gcs_uri}", Severity.INFO)
+    log_message(f"📏 [VEO GEN ASPECT RATIO]: {aspect_ratio}", Severity.INFO)
     if end_frame_gcs_uri:
         log_message(f"🏁 [VEO GEN END FRAME]: {end_frame_gcs_uri}", Severity.INFO)
 
@@ -244,7 +250,7 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
             last_frame = types.Image(gcs_uri=ensure_gs_uri(end_frame_gcs_uri), mime_type=img_mime)
 
         veo_config = types.GenerateVideosConfig(
-            number_of_videos=1, duration_seconds=clip_duration, aspect_ratio="16:9",
+            number_of_videos=1, duration_seconds=clip_duration, aspect_ratio=aspect_ratio,
             last_frame=last_frame,
             generate_audio=False,
             person_generation="allow_all",
@@ -451,7 +457,7 @@ async def _generate_storyline(company_name: str, product_name: str, rationale: s
 
     guidelines_context = f"\n\nReference Guidelines: {reference_guidelines[:2000]}" if reference_guidelines else ""
     persona_context = f"\n\nTARGET PERSONA: {customer_persona}" if customer_persona else ""
-    brand_wall = _get_brand_wall_directive(company_name, guidelines=tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, ""))
+    brand_wall = _get_brand_wall_directive(company_name, guidelines=reference_guidelines)
     
     prompt = (
         f"You are a LIFESTYLE DOCUMENTARY DIRECTOR. Your specialty is capturing the pure joy of human moments.\n\n"
@@ -495,7 +501,7 @@ async def _generate_storyline(company_name: str, product_name: str, rationale: s
 
 @stream_status("🎬 Directing the storyboard acts...")
 async def generate_campaign_storyboard(
-    tool_context: ToolContext, segment_name: str, selected_campaign_name: str, duration_seconds: int = 24
+    tool_context: ToolContext, segment_name: str, selected_campaign_name: str, duration_seconds: int = 24, aspect_ratio: str = "16:9"
 ):
     """Generates a multi-frame storyboard following a Human-First documentary pipeline."""
     set_output_folder(tool_context)
@@ -567,14 +573,15 @@ async def generate_campaign_storyboard(
 
     async def _gen_kf(idx):
         current_refs = refs if (idx % 2 == 0 or idx == NUM_KEYFRAMES - 1) else []
+        ar_desc = "16:9 landscape" if aspect_ratio == "16:9" else f"{aspect_ratio} vertical"
         prompt = (
             f"Photorealistic lifestyle storyboard frame {idx+1} of {NUM_KEYFRAMES} for {product_name} by {company_name}.\n"
             f"SCENE: {kf_descriptions[idx]}\n"
             f"LIGHTING: {kf_environments[idx]}\n"
             f"{compliance}\n"
-            f"16:9 landscape. Return only the image. NO text labels or counters."
+            f"{ar_desc}. Return only the image. NO text labels or counters."
         )
-        return await _generate_gemini_image(prompt, current_refs, label=f"storyboard_frame", aspect_ratio="16:9")
+        return await _generate_gemini_image(prompt, current_refs, label=f"storyboard_frame", aspect_ratio=aspect_ratio)
 
     log_message(f"Generating {NUM_KEYFRAMES} human-first keyframes for v{current_iter}...", Severity.INFO)
     kf_results = await asyncio.gather(*[_gen_kf(i) for i in range(NUM_KEYFRAMES)])
@@ -718,7 +725,7 @@ async def generate_display_ad(
 @stream_status("🎥 Rendering the final cinematic VEO commercial...")
 async def generate_video_from_storyboard(
     tool_context: ToolContext, selected_campaign_name: str, segment_name: str, duration_seconds: int = 24,
-    asset_tags: Optional[List[str]] = None, voiceover_script: Optional[str] = None
+    asset_tags: Optional[List[str]] = None, voiceover_script: Optional[str] = None, aspect_ratio: str = "16:9"
 ):
     """Produces the final stitched cinematic VEO video ad using a prioritized list of asset tags."""
     current_output_folder = set_output_folder(tool_context)
@@ -772,7 +779,7 @@ async def generate_video_from_storyboard(
         start_uri = storyboard_uris[act_idx] if act_idx < len(storyboard_uris) else storyboard_uris[-1]
         end_uri = storyboard_uris[act_idx + 1] if act_idx + 1 < len(storyboard_uris) else None
 
-        return act_idx, await _generate_single_veo_clip(full_motion, start_uri, CLIP_SEC, end_uri, label=f"act_{act_idx+1}")
+        return act_idx, await _generate_single_veo_clip(full_motion, start_uri, CLIP_SEC, end_uri, label=f"act_{act_idx+1}", aspect_ratio=aspect_ratio)
 
     log_message(f"Triggering {ACTS} VEO clips in parallel...", Severity.INFO)
     veo_results = await asyncio.gather(*[_gen_clip(i) for i in range(ACTS)])
@@ -807,7 +814,7 @@ async def generate_video_from_storyboard(
 
     filename = f"video_ad_final_{int(time.time())}.mp4"
     video_media = GeneratedMedia(filename=filename, mime_type="video/mp4", media_bytes=final)
-    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=True, gcs_folder=current_output_folder)
+    await utils_agents.save_to_artifact_and_render_asset(asset=video_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder)
 
     return {"status": "success", "gcs_url": get_public_url(f"{current_output_folder}/{filename}")}
 
