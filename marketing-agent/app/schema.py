@@ -235,6 +235,7 @@ class Brand(BaseModel):
 
 
 class SlidecastSlide(BaseModel):
+    slide_title: Optional[str] = None
     image_prompt: str
     script: str
     text_overlay: Optional[str] = None

@@ -9,6 +9,14 @@ If short-form vertical content (Shorts, Reels, TikToks) is requested, follow the
 
 ---
 
+## 0. Mandatory Instructions for All Short-Form Content
+1. **Always** optimize for mobile-first, vertical viewing experiences.
+2. **Always** Provide the user with the full range of options
+  - The substyle for the short (e.g., POV Storytelling, With-Me Companion, BTS Speedrun, Curated Resource Share, Contrarian Mythbuster).
+  - The art and voiceover style choices available to the agent
+  - Video should be animated by default, but the user can choose to have it be static with a voiceover instead.
+3. **Always** prioritize algorithmic engagement factors (e.g., retention, loopability, pattern interrupts) over traditional corporate branding or messaging norms.
+
 ## 1. Technical & Algorithmic Parameters
 
 Use these settings to optimize vertical content for algorithmic push and mobile delivery.
