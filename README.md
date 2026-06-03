@@ -8,12 +8,12 @@ Welcome to the **GenAI Content Engine**—an agentic workflow built on Google's 
 
 ## 📚 Technical Documentation
 
-To understand the architecture and the "art of the possible" behind this engine, please read our technical blog series located in the `documentation/technical/` directory:
+To understand the architecture and the "art of the possible" behind this engine, please read our technical blog series located in the `marketing-agent/documentation/technical/` directory:
 
-1. **[The GenAI Content Engine](documentation/technical/01-the-genai-content-engine.md)**: The executive pitch and overall workflow (Ideation → Storyboarding → Motion → Post-Production).
-2. **[Precision Storyboarding](documentation/technical/02-precision-storyboarding.md)**: How we use Skill-Driven Prompt Engineering, VLM-as-a-Judge (Gemini 2.5 Flash), and Stateful Surgical Edits to guarantee brand safety.
-3. **[Predictable Motion with Veo](documentation/technical/03-predictable-motion-with-veo.md)**: How First and Last Frame Conditioning puts a leash on `veo-3.1-generate-001` to eliminate AI video drift.
-4. **[Cinematic Post-Production](documentation/technical/04-cinematic-post-production.md)**: Using FFmpeg and "Hold Frame" transitions to stitch clips seamlessly and solve audio duration limits.
+1. **[The GenAI Content Engine](marketing-agent/documentation/technical/01-the-genai-content-engine.md)**: The executive pitch and overall workflow (Ideation → Storyboarding → Motion → Post-Production).
+2. **[Precision Storyboarding](marketing-agent/documentation/technical/02-precision-storyboarding.md)**: How we use Skill-Driven Prompt Engineering, VLM-as-a-Judge (Gemini 2.5 Flash), and Stateful Surgical Edits to guarantee brand safety.
+3. **[Predictable Motion with Veo](marketing-agent/documentation/technical/03-predictable-motion-with-veo.md)**: How First and Last Frame Conditioning puts a leash on `veo-3.1-generate-001` to eliminate AI video drift.
+4. **[Cinematic Post-Production](marketing-agent/documentation/technical/04-cinematic-post-production.md)**: Using FFmpeg and "Hold Frame" transitions to stitch clips seamlessly and solve audio duration limits.
 
 ---
 
@@ -33,13 +33,13 @@ marketing-agent/
 └── Makefile              # Development commands
 ```
 
-> 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
+> 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `marketing-agent/GEMINI.md`.
 
 ---
 
 ## 🚀 Getting Started
 
-For full installation instructions, infrastructure setup, and deployment guides, please see the **[Getting Started Guide](getting-started.md)**.
+For full installation instructions, infrastructure setup, and deployment guides, please see the **[Getting Started Guide](marketing-agent/getting-started.md)**.
 
 ---
 
