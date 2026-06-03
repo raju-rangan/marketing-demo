@@ -6,7 +6,7 @@ If you have followed this series, you know we've built a paranoid digital studio
 
 So now, we have a bunch of perfect video clips sitting in a Google Cloud bucket. 
 
-But a folder full of MP4s isn't a marketing asset. To deliver real value, the **GenAI Content Engine** has to automate the final, and often most difficult, step of video production: the edit.
+But a folder full of MP4s isn't a marketing asset. To deliver real value, the **Marketing Content Assistant** has to automate the final, and often most difficult, step of video production: the edit.
 
 If you just blindly smash AI-generated videos together, you get what I call the "Jarring AI Cut." Because GenAI video models are mathematically optimized to generate constant motion, cutting immediately from a high-kinetic panning shot into another high-kinetic panning shot overwhelms the viewer. It feels chaotic. It feels cheap.
 

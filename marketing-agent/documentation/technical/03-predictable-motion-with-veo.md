@@ -10,7 +10,7 @@ Here is where the real nightmare usually begins. If you hand those beautiful, co
 
 Generative video models (like Veo) are incredibly powerful, but they have a mind of their own. They might start the clip beautifully using your image, but by second 3, the presenter's face has morphed, the background has changed from a corporate office to a beach, and the video ends with the subject walking off-screen in the middle of a sentence.
 
-When you are building the **GenAI Content Engine** for a financial institution, "the AI wandered off-topic" is not an acceptable excuse. We need absolute, predictable motion. Here is how we put a leash on the `veo-3.1-generate-001` model.
+When you are building the **Marketing Content Assistant** for a financial institution, "the AI wandered off-topic" is not an acceptable excuse. We need absolute, predictable motion. Here is how we put a leash on the `veo-3.1-generate-001` model.
 
 ### The Predictability Problem
 

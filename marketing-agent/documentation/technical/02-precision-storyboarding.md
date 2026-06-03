@@ -8,7 +8,7 @@ But try building a GenAI application for a massive financial institution. Sudden
 
 Generative AI models are probabilistic. They roll the dice on every pixel. So, if we are demonstrating the *art of the possible* for enterprise AI, how do we mathematically force a probabilistic model to stay inside a strict corporate sandbox? 
 
-We had to build a system that acts less like a magic wand and more like a paranoid digital studio. Here is the secret sauce behind how the GenAI Content Engine actually pulls this off.
+We had to build a system that acts less like a magic wand and more like a paranoid digital studio. Here is the secret sauce behind how the Marketing Content Assistant actually pulls this off.
 
 ### Trick #1: Never Let the User Talk to the Image Model
 
