@@ -72,7 +72,8 @@ async def setup_product_campaign(
 
     tool_context.state[PRODUCT_COMPANY_NAME_STATE_KEY] = company_name
     tool_context.state["PRODUCT_NAME"] = product_name
-    tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = product_image_uri
+    # tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = product_image_uri
+    tool_context.state[PRODUCT_IMAGE_URI_STATE_KEY] = ""
     tool_context.state[LOGO_IMAGE_URI_STATE_KEY] = logo_uri
 
     # Display product image inline

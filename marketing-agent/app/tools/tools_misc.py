@@ -69,8 +69,17 @@ def select_brand_preset(tool_context: ToolContext, preset_name: str = None):
     if preset_name not in presets:
         # Try fuzzy match if exact match fails
         matches = [k for k in presets.keys() if preset_name.lower() in k.lower()]
-        if matches: preset_name = matches[0]
-        else: return {"status": "error", "details": f"Invalid brand preset '{preset_name}' for brand '{active_brand}'."}
+        if matches: 
+            preset_name = matches[0]
+        elif default_preset and default_preset in presets:
+            log_message(f"Fuzzy match failed for preset '{preset_name}', falling back to default '{default_preset}'", Severity.WARNING)
+            preset_name = default_preset
+        elif presets:
+            fallback = list(presets.keys())[0]
+            log_message(f"Fuzzy match failed, falling back to first available preset '{fallback}'", Severity.WARNING)
+            preset_name = fallback
+        else: 
+            return {"status": "error", "details": f"Invalid brand preset '{preset_name}' for brand '{active_brand}' and no presets available to fallback on."}
 
     preset = presets[preset_name]
     
@@ -156,6 +165,54 @@ def query_internal_knowledge_base(query: str, brand: str) -> str:
     except Exception as e:
         return f"Error querying knowledge base: {e}"
 
+def search_trends(product_category: str, tool_context: ToolContext) -> str:
+    """Searches the web for current market trends relevant to a product category using Google Search grounding.
+
+    Args:
+        product_category: The product category to research trends for (e.g. 'smart home cameras', 'EV tires', 'whisky').
+    """
+    log_message(f"Researching trends for category: {product_category}", Severity.INFO)
+    from google import genai
+    from google.genai import types as genai_types
+    from ..config import PROJECT_ID
+    
+    try:
+        client = genai.Client(vertexai=True, project=PROJECT_ID, location="global")
+
+        prompt = (
+            f"Research the latest market and consumer trends for the '{product_category}' category. "
+            f"Find:\n"
+            f"1. Top 5 micro trends (viral, social-media-driven, 3-18 months)\n"
+            f"2. Top 5 macro trends (long-lasting shifts, 1-5+ years)\n"
+            f"3. Key competitors and their current marketing strategies\n"
+            f"4. Social media buzz — what's trending on TikTok, Instagram, YouTube\n"
+            f"5. Upcoming seasonal or cultural moments to leverage\n\n"
+            f"For each trend include: trend name, summary, lifecycle stage, target audience, mood/aesthetic keywords, and color palette.\n"
+            f"Be specific and cite real sources. Do NOT hallucinate trends."
+        )
+
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=[genai_types.Content(role="user", parts=[genai_types.Part.from_text(text=prompt)])],
+            config=genai_types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=4096,
+                tools=[genai_types.Tool(google_search=genai_types.GoogleSearch())],
+            ),
+        )
+
+        result_text = ""
+        if response.candidates and response.candidates[0].content:
+            for part in response.candidates[0].content.parts:
+                if part.text:
+                    result_text += part.text
+
+        return result_text.strip() if result_text else "No trend data found."
+
+    except Exception as e:
+        log_message(f"Trend search failed: {e}", Severity.ERROR)
+        return f"Trend search failed: {e}. Using general market knowledge."
+
 def process_user_uploads(tool_context: ToolContext):
     """Scans for newly uploaded user images and registers them with high-priority tags."""
     registry = tool_context.state.get(ASSET_REGISTRY_STATE_KEY, {})
@@ -218,7 +275,6 @@ async def run_production_test(tool_context: ToolContext, url: str = "https://www
         }
 
     from .tools_slidecast import (
-        research_urls_to_report, 
         generate_slidecast_storyboard, 
         preview_slidecast_assets, 
         finalize_slidecast_video, 
@@ -236,11 +292,8 @@ async def run_production_test(tool_context: ToolContext, url: str = "https://www
     # Using 'Modern 3D Isometric' and 'Professional & Trustworthy' (Kalliope)
     select_slidecast_style(tool_context, "Modern 3D Isometric", "Professional & Trustworthy")
     
-    # 2. Research
-    report = research_urls_to_report(tool_context, [url])
-    
     # 3. Generate Storyboard (Targeting a 1-minute video for the test)
-    storyboard = generate_slidecast_storyboard(tool_context, report, duration_minutes=1)
+    storyboard = generate_slidecast_storyboard(tool_context, urls=[url], duration_seconds=60)
     if "error" in storyboard:
         return {"status": "error", "details": f"Storyboard generation failed: {storyboard['error']}"}
 
@@ -265,6 +318,6 @@ async def run_production_test(tool_context: ToolContext, url: str = "https://www
         "message": "Full Production Pipeline Validation Complete!",
         "video_url": video_result.get("video_url"),
         "composite_url": composite_url,
-        "report_summary": report[:500] + "...",
         "details": f"Validated: Research, Storyboard ({len(slides)} slides), Audio (Gemini TTS), Video (FFmpeg), and Composite (Image Stitching)."
     }
+

@@ -44,13 +44,26 @@ def bootstrap_infrastructure(project_id: str, location: str) -> str:
     bucket_name = f"{project_id}-artifacts"
     client = storage.Client(project=project_id)
     
+    lifecycle_rules = [
+        {
+            "action": {"type": "Delete"},
+            "condition": {"age": 7}
+        }
+    ]
+
     try:
         bucket = client.get_bucket(bucket_name)
         click.echo(f"  ✅ Artifacts bucket already exists: gs://{bucket_name}")
+        # Ensure lifecycle rules are up to date
+        bucket.lifecycle_rules = lifecycle_rules
+        bucket.patch()
+        click.echo("  ✅ Updated lifecycle rules (7-day TTL).")
     except Exception:
         click.echo(f"  🔧 Creating artifacts bucket: gs://{bucket_name}")
         bucket = client.create_bucket(bucket_name, location=location)
-        click.echo(f"  ✅ Created bucket: gs://{bucket_name}")
+        bucket.lifecycle_rules = lifecycle_rules
+        bucket.patch()
+        click.echo(f"  ✅ Created bucket with 7-day lifecycle policy: gs://{bucket_name}")
 
     # Update .env file with new project details
     dotenv_path = ".env"

@@ -32,3 +32,5 @@ def get_optional_env_var(var_name: str, default_val: str) -> str:
     """Gets an optional environment variable or returns default."""
     value = os.getenv(var_name)
     return value or default_val
+
+CONTEXT_UI_PREFIX = "ui:status_update"

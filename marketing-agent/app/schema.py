@@ -235,6 +235,7 @@ class Brand(BaseModel):
 
 
 class SlidecastSlide(BaseModel):
+    slide_title: Optional[str] = None
     image_prompt: str
     script: str
     text_overlay: Optional[str] = None
@@ -247,6 +248,7 @@ class SlidecastStoryboard(BaseModel):
     slides: List[SlidecastSlide]
     music_prompt: Optional[str] = "Cinematic and educational background music"
     video_url: Optional[str] = None
+    aspect_ratio: str
 
 class NanomationPhase(BaseModel):
     description: str

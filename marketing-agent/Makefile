@@ -65,7 +65,12 @@ playground: sync-assets
 	export ACTIVE_BRAND=$(BRAND_ID); uv run adk web . --port 8501 --reload_agents
 
 # Alias for debugging
-debug: playground
+debug: sync-assets
+	@echo "==============================================================================="
+	@echo "| 🐞 Starting your agent playground in DEBUG mode...                          |"
+	@echo "==============================================================================="
+	@sh -c 'sleep 3; echo "⏱️  Debugger is now ready for attachment"' &
+	export ACTIVE_BRAND=$(BRAND_ID); uv run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m google.adk.cli.main web . --port 8501 --reload_agents
 
 # Set up a new brand profile
 # Usage: make setup-brand BRAND="Brand Name" [URL="https://brand.com"]

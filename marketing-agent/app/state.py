@@ -90,7 +90,8 @@ SLIDE_STYLES = {
     "Documentary Realism": "High-quality documentary-style photography. Bright, even, and natural lighting. Authentic, real-world environments like modern classrooms, bright living rooms, or collaborative workspaces. Shallow depth of field to keep the subject in focus while blurring the background. Clean, professional, and highly trustworthy.",
     "Stop-Motion Claymation": "A charming stop-motion clay animation scene. The aesthetic is defined by soft, malleable clay textures with visible handmade imperfections. Use even, soft studio lighting and a simple, focused color palette to emphasize the tactile, handmade quality of the models.",
     "Minimalist Low-Poly 3D": "A minimalist 3D low-poly render, characterized by subjects and environments constructed from visible, flat-shaded polygons. Use soft, diffuse lighting and a shallow depth of field to focus on the central subject. The color palette should be harmonious and slightly muted, contributing to a clean, modern, and approachable aesthetic.",
-    "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts."
+    "Glassmorphism & Abstract Data": "Abstract, modern digital art utilizing glassmorphism. Translucent, frosted glass shapes floating in a clean, brightly lit environment. Soft, glowing accents in a professional blue and teal color palette. Clean, corporate, and highly structured, suitable for visualizing complex data and abstract technological concepts.",
+    "Pencil Sketch": "A rough, scrappy pencil sketch style featuring loose, expressive line art and hasty cross-hatching. The artwork should feel like a quick, conceptual doodle found in an artist's sketchbook or a founder's notebook. Use a black-and-white monochrome palette with uneven, messy graphite shading. Selectively, key focal elements are filled with brand-approved accent colors, rendered in a hasty, textured colored-pencil scribble. The background is a textured, slightly smudged off-white, slightly brown paper surface. Like unbleached kraft paper, with visible grain and imperfections, giving the piece an authentic, handmade feel. The overall aesthetic is raw, creative, and ideation-focused, perfect for early-stage brainstorming and concept visualization."
 }
 
 VOICEOVER_STYLES = {
@@ -103,3 +104,4 @@ VOICEOVER_STYLES = {
 
 CHOSEN_SLIDE_STYLE_STATE_KEY = "CHOSEN_SLIDE_STYLE"
 CHOSEN_VOICEOVER_STYLE_STATE_KEY = "CHOSEN_VOICEOVER_STYLE"
+ANIMATE_SLIDECAST_STATE_KEY = "ANIMATE_SLIDECAST"

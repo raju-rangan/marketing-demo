@@ -34,13 +34,12 @@ from google.genai import types
 
 from ..dtos.generated_media import GeneratedMedia
 from . import utils_gcs
-from .constants import get_required_env_var
+from .constants import CONTEXT_UI_PREFIX, get_required_env_var
 from .utils_logging import Severity, log_function_call, log_message
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
 GOOGLE_CLOUD_BUCKET_ARTIFACTS = get_required_env_var("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
 
-CONTEXT_UI_PREFIX = "ui:status_update"
 SESSION_STATE_ID = "SESSION_STATE_ID"
 SESSION_ARTIFACTS_STATE_KEY = "SESSION_ARTIFACTS_STATE"
 TEMP_ARTIFACTS_STATE_KEY = "TEMP_ARTIFACTS_STATE"
@@ -459,10 +458,15 @@ async def save_to_artifact_and_render_asset(
 
     store_inline_artifact_metadata(context, asset)
 
+    # Clear bytes to prevent them from being serialized in tool output/UI
+    asset.media_bytes = None
+
     return asset
 
 
-def store_inline_artifact_metadata(context: CallbackContext, asset: GeneratedMedia, add_to_temp: bool = False):
+def store_inline_artifact_metadata(context: CallbackContext, 
+                                   asset: GeneratedMedia, 
+                                   add_to_temp: bool = True) -> None:
     """Saves the asset metadata to the session state for inline retrieval.
 
     Args:
@@ -476,25 +480,24 @@ def store_inline_artifact_metadata(context: CallbackContext, asset: GeneratedMed
             "last_modified": datetime.now().isoformat()
         }
 
-         # Retrieve existing artifacts.
-        session_artifacts = context.state.get(SESSION_ARTIFACTS_STATE_KEY, {})
-        if not isinstance(session_artifacts, dict):
-            # Fallback if it was somehow initialized different than a dict
-            session_artifacts = {}
-
-        # Update or add the artifact entry
-        session_artifacts[asset.filename] = new_artifact_entry
-
-        # Save back to state
-        context.state[SESSION_ARTIFACTS_STATE_KEY] = session_artifacts
-
         if add_to_temp:
             temp_artifacts = context.state.get(f"{context.state.TEMP_PREFIX}{TEMP_ARTIFACTS_STATE_KEY}", {})
             if not isinstance(temp_artifacts, dict):
                 temp_artifacts = {}
             temp_artifacts[asset.filename] = new_artifact_entry
             context.state[f"{context.state.TEMP_PREFIX}{TEMP_ARTIFACTS_STATE_KEY}"] = temp_artifacts
+        else:
+             # Retrieve existing artifacts.
+            session_artifacts = context.state.get(SESSION_ARTIFACTS_STATE_KEY, {})
+            if not isinstance(session_artifacts, dict):
+                # Fallback if it was somehow initialized different than a dict
+                session_artifacts = {}
 
+            # Update or add the artifact entry
+            session_artifacts[asset.filename] = new_artifact_entry
+
+            # Save back to state
+            context.state[SESSION_ARTIFACTS_STATE_KEY] = session_artifacts
         log_message(f"Saved inline artifact metadata for: {asset.filename}", Severity.INFO)
     except Exception as e:
         log_message(f"WARNING: Failed to save inline artifact metadata: {e}", Severity.WARNING)
