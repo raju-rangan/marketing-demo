@@ -1,7 +1,7 @@
-# The GenAI Content Engine: Stop Making PDFs Nobody Reads
+# The Marketing Content Assistant: Reimagining Financial Education for the Video-First Era
 
 **By Raju Rangan, Google AI Specialist**
-the f
+
 Let’s be brutally honest for a second. Financial institutions spend millions of dollars every year researching and writing incredible educational content. You have massive, highly-vetted guides on "How to Avoid Credit Card Fraud" or "The First-Time Homebuyer’s Checklist." 
 
 And where does that goldmine of information live? Usually, it's buried in a static PDF or a dense FAQ page that nobody under the age of 35 is ever going to read. 
@@ -10,7 +10,7 @@ Meanwhile, your future customers—Gen Z and Millennials—are getting their fin
 
 So, how do you bridge that gap? You can't hire a massive video production agency for every single FAQ. But you also can't just type a prompt into a video generator and cross your fingers. 
 
-Here is how we solved this using Google’s Agent Development Kit (ADK) to build the **GenAI Content Engine**—and how we hacked the architecture to make it actually work for the enterprise.
+Here is how we solved this using Google’s Agent Development Kit (ADK) to build the **Marketing Content Assistant**—and how we hacked the architecture to make it actually work for the enterprise.
 
 ### The "Magic Prompt" Delusion
 
@@ -54,4 +54,4 @@ But what about the script itself? How do we stop the AI from inventing a fake cr
 
 We use a technique called **Source Grounding**. When the agent generates the storyboard script, we don't let it rely on its internal training data. Instead, the agent passes the URL of your existing, legally-approved article directly to a Google Search tool. The AI is mathematically constrained by the prompt: *"You must write a detailed educational segment strictly grounded in the content of the provided URLs. Do not include external facts."*
 
-With the GenAI Content Engine, you aren't just making cool videos. You are building an automated, hallucination-free bridge between your institution's deep expertise and the modern digital audience.
+With the Marketing Content Assistant, you aren't just making cool videos. You are building an automated, hallucination-free bridge between your institution's deep expertise and the modern digital audience.
