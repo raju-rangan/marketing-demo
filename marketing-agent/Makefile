@@ -46,6 +46,24 @@ authenticate:
 	fi
 	gcloud auth application-default set-quota-project $(GOOGLE_CLOUD_PROJECT)
 
+# Setup local environment and infrastructure
+setup: authenticate
+	@echo "==============================================================================="
+	@echo "| 🛠️ Bootstrapping Infrastructure (Buckets & Config)...                         |"
+	@echo "==============================================================================="
+	@if [ -z "$(GOOGLE_CLOUD_PROJECT)" ] || [ -z "$(GOOGLE_CLOUD_LOCATION)" ]; then \
+		echo "❌ ERROR: GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION must be set in .env"; exit 1; \
+	fi
+	uv run python -c "from app.app_utils.deploy import bootstrap_infrastructure; bootstrap_infrastructure('$(GOOGLE_CLOUD_PROJECT)', '$(GOOGLE_CLOUD_LOCATION)')"
+	@echo ""
+	@echo "⚠️  IMPORTANT: IAM Permissions Required"
+	@echo "Please ensure your Google Cloud user account has the following roles assigned:"
+	@echo "  - Vertex AI User (roles/aiplatform.user)"
+	@echo "  - Storage Object Admin (roles/storage.objectAdmin)"
+	@echo "  - Service Usage Consumer (roles/serviceusage.serviceUsageConsumer)"
+	@echo ""
+	@echo "You can now run 'make setup-brand BRAND=\"Your Brand\"' or 'make playground'"
+
 # ==============================================================================
 # Playground Targets
 # ==============================================================================
