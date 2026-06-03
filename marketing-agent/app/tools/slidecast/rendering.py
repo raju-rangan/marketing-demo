@@ -188,6 +188,16 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         # 2. Generate animation if missing
         if not video_bytes and animate_slides:
             log_message(f"Animating slide {idx+1} with Veo...", Severity.INFO)
+            approved_animation = (
+                "APPROVED ANIMATION LIBRARY:\n"
+                    "You must select and adapt the animation style based on the subject matter:\n"
+                    "If Characters/People: Animate them with fluid, purposeful actions that directly reflect the script while maintaining a professional demeanor.\n This is the most important rule. Prefer animation of natural, meaningful human motion that reinforces the educational message. Don't just have people or characters stay still.\n"
+                    "If Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing from left-to-right or bottom-to-top.\n"
+                    "If Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process.\n"
+                    "If Text & Highlights: Add a subtle sweeping metallic sheen or soft illumination behind key bullet points to draw the eye.\n"
+                    "If Icons & Spot Illustrations: Give elements gentle, localized motion (e.g., a globe slowly spinning, a gear slowly rotating on its Y-axis, or a gentle hovering loop).\n"
+                    "If Vehicles: Keep the vehicle locked in its original position, animate the wheels rotating, and add a subtle, slow-moving horizontal background blur or moving scenery to imply forward motion.\n\n"
+            )
             
             # Use Gemini to pick the best animation from the approved menu
             if sb.aspect_ratio == "9:16":
@@ -198,6 +208,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                     "CONSTRAINTS (DO NOT VIOLATE):\n"
                     "CAMERA: Focus on dynamic energy. Add slow cinematic push-ins (zooms), dramatic pans, or expressive character motion. Text preservation is important but secondary to visual impact.\n"
                     "SAFETY: All motion must be professional and educational. Do not generate chaotic, rapid, derogatory, or destructive motion (e.g., no crashes, no explosions). Frame all descriptions positively.\n\n"
+                    f"{approved_animation}\n\n"
                     "YOUR OUTPUT:\n"
                     "Based on the provided slide/script, you will ONLY output the two variables needed for the final video generation. Keep your descriptions highly visual and physical.\n"
                     "Output ONLY valid JSON matching this schema:\n"
@@ -217,14 +228,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
                     "TEXT: TEXT PRESERVATION IS ABSOLUTE. Do not add, animate, morph, or alter text or core slide layouts.\n"
                     "SAFETY: All motion must be professional and educational. Do not generate chaotic, rapid, derogatory, or destructive motion (e.g., no crashes, no explosions). Frame all descriptions positively (e.g., \"calm and controlled\").\n"
                     "MOTION STYLE: Focus entirely on subtle, localized \"cinemagraph\" motion tied to the narrative.\n\n"
-                    "APPROVED ANIMATION LIBRARY:\n"
-                    "You must select and adapt the animation style based on the subject matter:\n"
-                    "If Charts & Graphs: Animate data lines slowly growing, bars subtly filling, or data points softly glowing from left-to-right or bottom-to-top.\n"
-                    "If Diagrams & Workflows: Make connection arrows pulse with light, flowing from one step to the next to show a process.\n"
-                    "If Text & Highlights: Add a subtle sweeping metallic sheen or soft illumination behind key bullet points to draw the eye.\n"
-                    "If Icons & Spot Illustrations: Give elements gentle, localized motion (e.g., a globe slowly spinning, a gear slowly rotating on its Y-axis, or a gentle hovering loop).\n"
-                    "If Characters/People: Animate them with slow, fluid, purposeful actions that directly reflect the script while maintaining a professional demeanor.\n"
-                    "If Vehicles: Keep the vehicle locked in its original position, animate the wheels rotating, and add a subtle, slow-moving horizontal background blur to imply forward motion.\n\n"
+                    f"{approved_animation}\n\n"
                     "YOUR OUTPUT:\n"
                     "Based on the provided slide/script, you will ONLY output the two variables needed for the final video generation. Keep your descriptions highly visual and physical.\n"
                     "Output ONLY valid JSON matching this schema:\n"

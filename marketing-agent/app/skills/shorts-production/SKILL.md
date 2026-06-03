@@ -1,31 +1,31 @@
 ---
 name: shorts-production
-description: Guidelines for high-retention, viral vertical video production targeting younger demographics (Gen Z and Gen Alpha) with dynamic sub-skill orchestration.
+description: Guidelines for high-retention, professional vertical video production targeting financial audiences and establishing thought leadership with dynamic sub-skill orchestration.
 ---
 
 # Shorts & Social Media Overrides
 
-If short-form vertical content (Shorts, Reels, TikToks) is requested, follow the standard workflow but apply these mandatory high-energy overrides.
+If short-form vertical content (Shorts, Reels, LinkedIn Video) is requested, follow the standard workflow but apply these mandatory format overrides to ensure professional impact and algorithmic performance.
 
 ---
 
 ## 0. Mandatory Instructions for All Short-Form Content
 1. **Always** optimize for mobile-first, vertical viewing experiences.
 2. **Always** Provide the user with the full range of options
-  - The substyle for the short (e.g., POV Storytelling, With-Me Companion, BTS Speedrun, Curated Resource Share, Contrarian Mythbuster).
-  - The art and voiceover style choices available to the agent
+  - The substyle for the short (e.g., The Advisor POV, The Professional With-Me, The Market Speedrun, Institutional Insight Share, Financial Mythbuster).
+  - The art and voiceover style choices available to the agent.
   - Video should be animated by default, but the user can choose to have it be static with a voiceover instead.
-3. **Always** prioritize algorithmic engagement factors (e.g., retention, loopability, pattern interrupts) over traditional corporate branding or messaging norms.
+3. **Always** prioritize clarity, data accuracy, and professional authority over aggressive "viral" tropes. 
 
 ## 1. Technical & Algorithmic Parameters
 
-Use these settings to optimize vertical content for algorithmic push and mobile delivery.
+Use these settings to optimize vertical content for professional algorithmic push (e.g., LinkedIn, YouTube Shorts) and mobile delivery.
 
-| Parameter | Mandatory Value | Algorithmic Purpose |
+| Parameter | Mandatory Value | Purpose |
 |---|---|---|
-| **Duration** | `duration_seconds=30` to `50` | Optimizes completion rate and loop potential. |
+| **Duration** | `duration_seconds=30` to `60` | Optimizes for professional attention spans and complete thought delivery. |
 | **Aspect Ratio** | `aspect_ratio="9:16"` | Delivers native, full-screen vertical layout. |
-| **Safe Zone** | Middle 60% of screen | Prevents UI overlays from blocking text or key visuals. |
+| **Safe Zone** | Middle 60% of screen | Prevents UI overlays from blocking charts, text, or key visuals. |
 | **Frame Rate** | 24fps (Cinematic) or 30fps (Fluid) | Guarantees high-quality visual rendering on mobile screens. |
 
 ---
@@ -34,37 +34,37 @@ Use these settings to optimize vertical content for algorithmic push and mobile 
 
 When generating a Short, you MUST choose one of the following specialized sub-skills to define the narrative structure. DO NOT use generic corporate templates.
 
-- **`pov-storytelling`**: Use for relatable, office-drama, or struggle-to-success narratives. (e.g., "POV: You finally finished your [Project]").
-- **`curated-resource-share`**: Use for listicles, tool roundups, or value-first "secret" resource drops. High save potential.
-- **`bts-speedrun`**: Use for showing complex builds, designs, or technical processes at lightning speed. Highly satisfying.
-- **`with-me-companion`**: Use for humanizing the brand with calm, "GRWM" or co-working style authentic content. High ASMR focus.
-- **`contrarian-mythbuster`**: Use for high-engagement "Stop doing X" or "Everything you know about Y is wrong" hooks. Strong pattern interrupts.
+- **`pov-storytelling` (The Advisor POV)**: Use for relatable financial scenarios, client advisory moments, and market navigation.
+- **`curated-resource-share` (Institutional Insight Share)**: Use for market roundups, or exclusive strategy frameworks. Establishes premium knowledge.
+- **`bts-speedrun` (The Market Speedrun)**: Use for showing complex financial models or real-time market data being analyzed at lightning speed.
+- **`with-me-companion` (The Professional With-Me)**: Use for humanizing the brand by showing the authentic routine of a portfolio manager, analyst, or advisor.
+- **`contrarian-mythbuster` (The Financial Mythbuster)**: Use for challenging conventional financial wisdom or breaking down a common market misconception with data.
 
 ---
 
-## 3. The Gen Z / Youth-Audience Virality Recipe
+## 3. The Professional Authority Recipe
 
-Younger demographics reject sterile, overly-designed corporate templates. Use the following structure to drive organic engagement.
+Financial audiences reject overly-designed corporate templates but also distrust overly-casual viral tropes. Use the following structure to drive engagement through authority.
 
-### Phase 1: The FaceTime Visual Hook (0–3 Seconds)
-* **The Visual**: Start immediately with high-contrast, extreme close-up footage or an immediate scale transition (zoom-in). No logo fades, generic intro slides, or intro music.
-* **The Style**: Prioritize a raw, casual, "creator-to-camera" visual style over polished studio setups.
-* **The Hook Text**: Present a high-stakes question, an undeniable claim, or a curiosity gap.
+### Phase 1: The Thesis Hook (0–3 Seconds)
+* **The Visual**: Start immediately with a clean, well-lit shot of the speaker or a high-contrast, premium title card. No long logo fades.
+* **The Style**: Prioritize a polished, "direct-to-camera" advisory visual style.
+* **The Hook Text**: Present a clear market thesis, a common client question, or a data-backed assertion.
 
-### Phase 2: The "Secondary Hook" Retention Machine (3–30 Seconds)
-Sustain attention by delivering a visual or auditory pattern interrupt every **2 to 3 seconds**.
+### Phase 2: The Analytical Retention Engine (3–40 Seconds)
+Sustain attention by delivering visual clarity and structural logic.
 
 | Retention Element | Practical Implementation |
 |---|---|
-| **Kinetic Text** | Pop huge, single-word or short-phrase captions in the center. Avoid long paragraphs. |
-| **Color Accents** | Highlight high-value verbs or statistics in neon yellow (`#FFDE17`) or electric green (`#39FF14`). |
-| **Visual Variety** | Introduce zoom-ins, pans, cuts, or micro-animations every 2 seconds. |
-| **Rhythmic Audio** | Sync video cuts to the high-tempo beats of background music. |
-| **Action SFX** | Add sharp, subtle audio cues (e.g., whooshes for transitions, dings for text pops). |
+| **Clean Typography** | Use professional fonts (Roboto, Open Sans). Avoid casual app-bubble styles. |
+| **Data Highlighting** | Highlight key metrics or trend lines using the brand's primary and secondary color palette. Avoid aggressive neons. |
+| **Visual Evidence** | Introduce charts, graphs, or terminal screens to support the spoken claims. |
+| **Measured Audio** | Voiceover must be authoritative and clear. Background music should be sophisticated and drive momentum without overwhelming the speech. |
+| **Subtle Transitions** | Use clean cuts, smooth pans, or soft light sweeps. Avoid chaotic jump cuts. |
 
-### Phase 3: The Curiosity Loop & Seamless Exit
-* **The Loop**: Mention a high-value tip or climax early (e.g., *"Wait until the third tip, it changes everything..."*) and keep the promise unresolved until the final 5 seconds.
-* **The CTA**: Ensure the call to action is direct and abrupt (e.g., *"Link in bio to try it yourself"* or *"Follow for more hacks"*).
+### Phase 3: The Advisory Conclusion
+* **The Resolution**: Deliver a clear, strategic takeaway or actionable insight.
+* **The CTA**: Ensure the call to action is professional (e.g., *"Read our latest market outlook to go deeper"* or *"Subscribe for daily market analysis"*).
 
 ---
 
@@ -72,17 +72,17 @@ Sustain attention by delivering a visual or auditory pattern interrupt every **2
 
 If the user selects a specific trend style, or if their goal aligns with one of these paths, you must immediately load and execute the corresponding `.md` sub-skill file to guide visual pacing, audio choices, and scripting structures:
 
-| Creative Format | Description | Target Sub-Skill File |
-|---|---|---|
-| **POV Storytelling** | Emotional relatability and dramatized scenarios. | `pov-storytelling-skill.md` |
-| **The "With-Me" Companion** | Calm, aesthetic, ASMR-focused co-working content. | `with-me-companion-skill.md` |
-| **The BTS Speedrun** | Rapid-fire creation compilations. | `bts-speedrun-skill.md` |
-| **The Curated Resource Share** | Listicles and "secret" resource roundups. | `curated-resource-share-skill.md` |
-| **The Contrarian Mythbuster** | Challenging the status quo with high-stakes hooks. | `contrarian-mythbuster-skill.md` |
+| Creative Format | Target Sub-Skill File |
+|---|---|
+| **The Advisor POV** | `pov-storytelling-skill.md` |
+| **The Professional "With-Me"** | `with-me-companion-skill.md` |
+| **The Market Speedrun** | `bts-speedrun-skill.md` |
+| **Institutional Insight Share** | `curated-resource-share-skill.md` |
+| **The Financial Mythbuster** | `contrarian-mythbuster-skill.md` |
 
 ### Dynamic Loading Logic
 * **If Format is POV**: Load and execute instructions in `subskills/pov-storytelling-skill.md`.
 * **If Format is With-Me**: Load and execute instructions in `subskills/with-me-companion-skill.md`.
-* **If Format is BTS Speedrun**: Load and execute instructions in `subskills/bts-speedrun-skill.md`.
-* **If Format is Curated Share**: Load and execute instructions in `subskills/curated-resource-share-skill.md`.
+* **If Format is Speedrun**: Load and execute instructions in `subskills/bts-speedrun-skill.md`.
+* **If Format is Insight Share**: Load and execute instructions in `subskills/curated-resource-share-skill.md`.
 * **If Format is Mythbuster**: Load and execute instructions in `subskills/contrarian-mythbuster-skill.md`.

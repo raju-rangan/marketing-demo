@@ -1,11 +1,11 @@
 ---
 name: curated-resource-share
-description: Optimization rules for listicles and resource roundups designed to maximize social saves and shares.
+description: Optimization rules for listicles and resource roundups designed to maximize social saves and shares by providing high-value financial insights.
 ---
 
-# Style: The Curated Resource Share
+# Style: The Institutional Insight Share
 
-Use this skill when providing value-first lists, tool roundups, or secret resources. This format is heavily rewarded by social algorithms due to high "Save" metrics.
+Use this skill when providing value-first lists, market roundups, or exclusive strategy frameworks. This format is heavily rewarded by social algorithms due to high "Save" metrics, establishing the brand as a premium knowledge source.
 
 ---
 
@@ -13,14 +13,14 @@ Use this skill when providing value-first lists, tool roundups, or secret resour
 
 | Phase | Timecode | Scripting Hook & Formula | Visual Direction | Sound Design |
 |---|---|---|---|---|
-| **The Value Hook** | `00:00 - 00:03` | *"3 secret design cheat-codes that feel completely illegal to know..."* | Point to a massive neon green text overlay in the center. | **Heavy swoosh SFX** + upbeat, trendy house beat. |
-| **Item #1** | `00:03 - 00:12` | *"First up is [X]. It instantly automates your [Process] without..."* | Screen recording of the tool/resource in action. Highlight key features. | Fast typing **SFX** underneath the background track. |
-| **Item #2** | `00:12 - 00:22` | *"Second is [Y]. Use this whenever you need to bypass..."* | Fast transition cut to the second tool. 2-second camera pans. | Sharp "Ding" sound effect when the logo pops. |
-| **Item #3 (The Climax)** | `00:22 - 00:32` | *"But the absolute best one is [Z]. It literally lets you..."* | Emphasize this as the most valuable resource. Zoom into the interface. | Music volume swells; high-energy voice delivery. |
-| **The Share CTA** | `00:32 - 00:38` | *"Save this video before they make us take it down."* (Urgency-based CTA). | Fast cut to a clean, bold graphic summarizing the 3 tools. | Dramatic ending note. |
+| **The Value Hook** | `00:00 - 00:03` | *"3 strategic frameworks used by top portfolio managers to navigate [Current Market Condition]..."* | Professional, focused shot of the speaker or a sleek, high-end title card. | **Subtle, premium swoosh SFX** + sophisticated, driving instrumental beat. |
+| **Insight #1** | `00:03 - 00:12` | *"First is [Strategy X]. It allows investors to systematically hedge against..."* | Clean infographic or screen capture of a proprietary dashboard demonstrating the concept. | Soft, analytical UI "blip" **SFX**. |
+| **Insight #2** | `00:12 - 00:22` | *"Second is [Strategy Y]. We look at this specifically when evaluating..."* | Smooth transition to the second visual. Elegant data visualization (e.g., a dynamic pie chart or scatter plot). | Clean page-turn or transition sound. |
+| **Insight #3 (The Core Value)** | `00:22 - 00:32` | *"But the most critical shift we're seeing right now is [Strategy Z]. This fundamentally changes how..."* | Emphasize this as the most valuable insight. Zoom gently into a critical data trend line. | Music volume swells slightly; voice delivery is authoritative and focused. |
+| **The Save CTA** | `00:32 - 00:38` | *"Save this framework for your next quarterly review, and link in bio for the full report."* (Value-based CTA). | Fade to a clean, bold graphic summarizing the 3 key points. | Dramatic, professional ending note. |
 
 ---
 
 ## 2. "Save-Worthy" Formatting Rules
-- **Summary Card**: The final 2 seconds must show a single, clean "cheat-sheet" style slide summarizing all three resources. This forces viewers to pause the video or screenshot it (which is algorithmically tracked as high engagement).
-- **Subtitles**: Keep the names of the resources massive and on-screen for the entire duration of their segment.
+- **Summary Card**: The final 2 seconds must show a single, clean "Executive Summary" style slide outlining all three insights. This forces viewers to pause the video or screenshot it (which is algorithmically tracked as high engagement) and provides tangible value.
+- **Typography**: Keep the names of the specific strategies or financial models prominently displayed during their respective segments using clean, corporate typography.
