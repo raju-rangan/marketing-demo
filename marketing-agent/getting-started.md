@@ -13,9 +13,10 @@ Before you begin, ensure you have:
 
 Before you can create a brand or run the playground, you must authenticate and bootstrap your Google Cloud infrastructure (like creating the artifact storage bucket).
 
-Run the following command:
+Run the following commands to install dependencies and configure your environment:
 
 ```bash
+make install
 make setup
 ```
 
