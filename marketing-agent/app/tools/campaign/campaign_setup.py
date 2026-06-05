@@ -15,11 +15,11 @@
 import json
 import os
 from google.adk.tools.tool_context import ToolContext
-from ..adk_common.dtos.generated_media import GeneratedMedia
-from ..adk_common.utils import utils_agents, utils_gcs, utils_prompts
-from ..adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
+from ...adk_common.dtos.generated_media import GeneratedMedia
+from ...adk_common.utils import utils_agents, utils_gcs, utils_prompts
+from ...adk_common.utils.utils_logging import Severity, log_message, stream_status, log_status
 
-from ..state import (
+from ...state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     PRODUCT_IMAGE_URI_STATE_KEY,
     LOGO_IMAGE_URI_STATE_KEY,
@@ -30,12 +30,12 @@ from ..state import (
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     AGENT_VERSION,
 )
-from ..utils.campaign_utils import (
+from ...utils.campaign_utils import (
     Campaign,
     parse_campaigns_from_xml,
 )
-from ..utils.generate_campaigns import generate_campaigns_xml
-from ..utils.utils_gcs import set_output_folder
+from ...utils.generate_campaigns import generate_campaigns_xml
+from ...utils.utils_gcs import set_output_folder
 
 # Internal cache for campaigns
 _CACHED_CAMPAIGNS_LIST: list[Campaign] | None = None
@@ -136,7 +136,7 @@ def get_campaign_idea(tool_context: ToolContext, quantity: int):
     ideas = [{"name": c.name, "tagline": c.tagline} for c in _CACHED_CAMPAIGNS_LIST[:quantity]]
     return {"status": "success", "ideas": ideas}
 
-def save_selected_campaign(chosen_idea: str, tool_context: ToolContext):
+def save_selected_campaign(tool_context: ToolContext, chosen_idea: str):
     """Saves the user's chosen campaign idea to the session state."""
     tool_context.state[CHOSEN_CAMPAIGN_IDEA_STATE_KEY] = chosen_idea
     return {"status": "success", "selected_campaign": chosen_idea}

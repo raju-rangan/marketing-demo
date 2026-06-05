@@ -5,7 +5,7 @@ from fpdf import FPDF
 from google import genai
 from google.genai import types
 from google.adk.tools.tool_context import ToolContext
-from ..tools_misc import select_brand_preset
+from ..misc import select_brand_preset
 from ...adk_common.utils.utils_logging import Severity, log_message
 from ...state import (
     GOOGLE_CLOUD_PROJECT,
@@ -84,7 +84,7 @@ def _get_slidecast_format_directives(aspect_ratio: str, language: str, company_n
         structure_requirements = (
             f"- SLIDE 1 MUST BE A TITLE SLIDE: It should feature a bold, cinematic title of the topic in {language} and a welcoming, high-level introduction narration in {language}.\n"
             f"- FINAL SLIDE MUST BE A SUMMARY/CONCLUSION SLIDE: It must summarize the key takeaways in a logical manner and bring the presentation to a smooth, definitive close, avoiding any abrupt endings. If the article has an existing conclusion or summary, use that.\n"
-            f"- LOGO INTEGRATION: Every slide MUST have the {company_name} logo in the bottom right corner. Include this in the image_prompt."
+            f"- LOGO INTEGRATION: The system will programmatically overlay the {company_name} logo in the bottom right corner. Ensure your image prompts leave the bottom right corner clear of key content (text, critical diagrams) to accommodate this overlay. Do NOT ask the image generator to draw the logo itself."
         )
         core_directives = (
             f"1. VISUAL SELF-SUFFICIENCY: Every image prompt MUST describe a professional infographic with text, diagrams, and data. ALL TEXT LABELS MUST BE IN {language}.\n"
@@ -99,13 +99,13 @@ def _get_slidecast_format_directives(aspect_ratio: str, language: str, company_n
             f"  \"slides\": [\n"
             f"    {{\n"
             f"      \"slide_title\": \"[Concise Slide Title]\",\n"
-            f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography in {language}. Include logo in bottom right. ALL text on the slide MUST be in {language}.]\",\n"
+            f"      \"image_prompt\": \"[Title Slide layout for {company_name} with the topic title in large typography in {language}. Leave bottom right corner clear for logo overlay. ALL text on the slide MUST be in {language}.]\",\n"
             f"      \"script\": \"[Introductory narration in {language} of approx {words_per_slide} words...]\",\n"
             f"      \"text_overlay\": \"\" \n"
             f"    }},\n"
             f"    {{\n"
             f"      \"slide_title\": \"[Concise Slide Title]\",\n"
-            f"      \"image_prompt\": \"[Infographic layout with data and labels in {language}. Include logo in bottom right...]\",\n"
+            f"      \"image_prompt\": \"[Infographic layout with data and labels in {language}. Leave bottom right corner clear for logo overlay...]\",\n"
             f"      \"script\": \"[Detailed educational narration in {language}...]\",\n"
             f"      \"text_overlay\": \"\" \n"
             f"    }}\n"

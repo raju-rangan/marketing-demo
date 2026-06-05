@@ -1,6 +1,13 @@
 ---
 name: slidecast-production
 description: Provides workflow rules and instructions for slidecast production.
+adk_additional_tools:
+  - select_slidecast_style
+  - generate_slidecast_storyboard
+  - update_slidecast_slide
+  - update_storyboard_visual_style
+  - preview_slidecast_assets
+  - finalize_slidecast_video
 ---
 
 # Slidecast Production Workflow

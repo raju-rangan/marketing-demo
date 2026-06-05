@@ -42,7 +42,7 @@ Every slide must be **self-sufficient**. The viewer should be able to understand
 3.  **Data Callouts**: Small labels that explain specific parts of the visual.
 
 ## Compliance & Branding
-- **Logo Integration**: Integrate the brand logo subtly into a corner or header area as part of the visual layout.
+- **Logo Integration**: The system will programmatically overlay the official brand logo (typically in the bottom right corner). Do NOT request the image generation model to render the logo itself. Instead, ensure your image prompts leave the target corner clear of key content (text, critical diagrams) to accommodate this programmatic overlay.
 - **Color Palette**: Use the brand's primary color palette as defined in the Brand Vault for all diagrams, background panels, and UI elements.
 - **Tone**: Maintain a tone that aligns with the specific brand identity and guidelines.
 - **Brand Wall**: Adhere strictly to the exclusion rules defined in the Brand Vault.

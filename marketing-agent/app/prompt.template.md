@@ -10,6 +10,7 @@ You have specialized **skills** that provide domain expertise on demand. Load th
 - **Before video ads (Long-form)** → load `slidecast-production` skill
 - **Before video ads (Shorts)** → load `shorts-production` skill
 - **For single-shot executive pitches (Autopilot)** → load `autopilot-pitch` skill
+- **When generating illustrations or storyboard frames** → load the appropriate illustration generator skill for the active brand (e.g., `chase-illustration-generator` for Chase)
 
 **Product Setup Status:** `{{PRODUCT_SETUP_DONE}}`
 

@@ -8,7 +8,7 @@ from ...state import (
     SLIDE_STYLES,
 )
 from ...schema import SlidecastStoryboard
-from ..tools_misc import select_brand_preset
+from ..misc import select_brand_preset
 from .utils import (
     _get_slidecast_branding_context,
     _get_slidecast_format_directives,
@@ -214,7 +214,7 @@ def update_storyboard_visual_style(tool_context: ToolContext, storyboard: dict, 
             f"CURRENT NARRATION SCRIPT (For context only):\n{slide.script}\n\n"
             f"TASK:\n"
             f"Rewrite the CURRENT IMAGE PROMPT so that it perfectly aligns with the new visual style. "
-            f"Ensure the new image prompt still describes a scene that makes sense with the narration script, and still includes the {company_name} logo in the bottom right corner.\n\n"
+            f"Ensure the new image prompt still describes a scene that makes sense with the narration script, and leaves the bottom right corner clear for the logo overlay.\n\n"
             f"Output ONLY the new raw image prompt string, nothing else. No quotes, no JSON."
         )
 

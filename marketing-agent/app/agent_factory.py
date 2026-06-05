@@ -34,11 +34,11 @@ from .state import (
 from .utils.utils_gcs import get_public_url
 
 # Import tools
-# from .tools.tools_campaign import (
+# from .tools.campaign import (
 #     # setup_product_campaign,
 #     # get_selected_brief,
 # )
-from .tools.tools_misc import (
+from .tools.misc import (
     select_brand_preset,
     query_internal_knowledge_base,
     process_user_uploads,
@@ -46,7 +46,7 @@ from .tools.tools_misc import (
     search_trends,
 )
 
-from .tools.tools_slidecast import (
+from .tools.slidecast import (
     generate_slidecast_storyboard,
     update_slidecast_slide,
     update_storyboard_visual_style,
@@ -54,6 +54,7 @@ from .tools.tools_slidecast import (
     finalize_slidecast_video,
     select_slidecast_style,
     generate_slide_animation_plan,
+    execute_slide_animation,
 )
 
 # ============================================================
@@ -120,11 +121,23 @@ _SKILLS_DIR = os.path.join(os.path.dirname(__file__), "skills")
 
 marketing_skills = SkillToolset(
     skills=[
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "slidecast-production")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "shorts-production")),
-        # load_skill_from_dir(os.path.join(_SKILLS_DIR, "nanomation")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "trend-analysis")),
-        load_skill_from_dir(os.path.join(_SKILLS_DIR, "autopilot-pitch")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "workflows", "slidecast-production")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "workflows", "shorts-production")),
+        # load_skill_from_dir(os.path.join(_SKILLS_DIR, "content-generation", "nanomation")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "domain-expertise", "trend-analysis")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "workflows", "autopilot-pitch")),
+        load_skill_from_dir(os.path.join(_SKILLS_DIR, "content-generation", "chase-illustration-generator")),
+    ],
+    additional_tools=[
+        select_slidecast_style,
+        generate_slidecast_storyboard,
+        update_slidecast_slide,
+        update_storyboard_visual_style,
+        preview_slidecast_assets,
+        finalize_slidecast_video,
+        generate_slide_animation_plan,
+        execute_slide_animation,
+        search_trends,
     ],
 )
 
@@ -147,13 +160,14 @@ root_agent = Agent(
         run_production_test,
         get_public_url,
         search_trends,
+        select_slidecast_style,
         generate_slidecast_storyboard,
         update_slidecast_slide,
         update_storyboard_visual_style,
         preview_slidecast_assets,
         finalize_slidecast_video,
-        select_slidecast_style,
         generate_slide_animation_plan,
+        execute_slide_animation,
     ],
 )
 

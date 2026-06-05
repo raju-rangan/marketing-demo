@@ -66,6 +66,8 @@ CHOSEN_ASSET_SHEET_ID_STATE_KEY = "CHOSEN_ASSET_SHEET_ID"
 PRODUCT_COMPANY_NAME_STATE_KEY = get_optional_env_var("PRODUCT_COMPANY_NAME_STATE_KEY", "PRODUCT_COMPANY_NAME")
 PRODUCT_IMAGE_URI_STATE_KEY = "PRODUCT_IMAGE_URI"
 LOGO_IMAGE_URI_STATE_KEY = "LOGO_IMAGE_URI"
+LOGO_HORIZONTAL_IMAGE_URI_STATE_KEY = "LOGO_HORIZONTAL_IMAGE_URI"
+LOGO_VERTICAL_IMAGE_URI_STATE_KEY = "LOGO_VERTICAL_IMAGE_URI"
 PRODUCT_SETUP_DONE_STATE_KEY = "PRODUCT_SETUP_DONE"
 GENERATED_GCS_URIS_STATE_KEY = "GENERATED_GCS_URIS"
 SELECTED_ASSET_SHEETS_STATE_KEY = "SELECTED_ASSET_SHEETS"
@@ -84,6 +86,7 @@ UPLOAD_COUNTER_STATE_KEY = "UPLOAD_COUNTER"
 # ============================================================
 
 SLIDE_STYLES = {
+    "Chase Brand Illustration": "Flat vector illustration with overlapping geometric planes and crisp, clean lineless edges. Dominated by layers of Chase Deep Navy, Royal Blue, and Ice Blue. Human elements feature realistic, diverse skin undertones. Accents of Pink/Coral or Success Yellow on critical interactive points. Subtle fine-grained noise sand-texture overlay on color gradients. Sharp, flat geometric navy-blue shadows. Graceful, realistic human proportions and minimalist, calm facial features. Optimistic, modern, clean, premium corporate editorial tone.",
     "Flat Vector Explainer": "Clean, flat 2D vector illustration style. High-contrast, minimalist design with a bright, approachable color palette. Solid backgrounds with ample negative space for text and diagrams. No gradients or 3D shading; focus on clear visual communication and infographic-style simplicity.",
     "Modern 3D Isometric": "Clean 3D isometric rendering, soft claymorphism style. Matte pastel textures, smooth rounded edges, and soft, diffused studio lighting. Clean solid-color background. Visually pleasing, friendly, and highly legible. Emphasize playful, modern educational UI/UX design.",
     "Minimalist Flat Characters": "A flat vector illustration featuring minimalist corporate Memphis design elements. The style uses clean geometric shapes, solid color backgrounds, and thin lines for facial features. It has a cheerful color palette of primary blues, reds, yellows, and greens. Characters are rendered as friendly, diverse, abstract avatars with simple silhouettes, smooth curves, and no gradients, creating a modern tech-company aesthetic suitable for user interfaces and corporate branding.",

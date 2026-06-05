@@ -1,6 +1,9 @@
 ---
 name: nanomation
 description: Provides workflow rules and instructions for nanomation.
+adk_additional_tools:
+  - generate_slide_animation_plan
+  - execute_slide_animation
 ---
 
 # Nanomation (Animated Slides) Workflow

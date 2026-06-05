@@ -33,10 +33,14 @@ install:
 # Authenticate with Google Cloud and verify project consistency
 authenticate:
 	@echo "==============================================================================="
-	@echo "| 🔐 Authenticating with Google Cloud...                                      |"
+	@echo "| 🔐 Verifying/Authenticating with Google Cloud...                            |"
 	@echo "==============================================================================="
-	gcloud auth login
-	gcloud auth application-default login
+	@if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then \
+		gcloud auth login; \
+		gcloud auth application-default login; \
+	else \
+		echo "✅ Already authenticated with Google Cloud."; \
+	fi
 	@AUTH_PROJECT=$$(gcloud config get-value project 2>/dev/null); \
 	if [ "$$AUTH_PROJECT" != "$(GOOGLE_CLOUD_PROJECT)" ]; then \
 		echo "🔄 Authenticated project ($$AUTH_PROJECT) does not match. Setting project to $(GOOGLE_CLOUD_PROJECT)..."; \
@@ -45,6 +49,7 @@ authenticate:
 		echo "✅ Authenticated project matches GOOGLE_CLOUD_PROJECT: $$AUTH_PROJECT"; \
 	fi
 	gcloud auth application-default set-quota-project $(GOOGLE_CLOUD_PROJECT)
+
 
 # Setup local environment and infrastructure
 setup: authenticate

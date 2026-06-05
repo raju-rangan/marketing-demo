@@ -1,6 +1,8 @@
 ---
 name: trend-analysis
 description: "Market trend analysis and product-trend mapping expertise. Covers how to interpret trend data, align products to cultural moments, and weave them into storyboard generation."
+adk_additional_tools:
+  - search_trends
 ---
 <!-- markdownlint-disable -->
 

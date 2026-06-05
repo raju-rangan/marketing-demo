@@ -10,7 +10,7 @@ from ...state import (
 )
 from ...utils.utils_gcs import get_public_url, set_output_folder
 from ...schema import NanomationPlan
-from ..tools_media import _generate_gemini_image, _generate_single_veo_clip
+from ..media import _generate_gemini_image, _generate_single_veo_clip
 from .utils import client, types
 
 def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, duration_seconds: int = 5) -> dict:

@@ -9,6 +9,8 @@ from ...adk_common.utils import utils_agents, utils_gcs
 from ...adk_common.utils.utils_logging import Severity, log_message, stream_status
 from ...state import (
     LOGO_IMAGE_URI_STATE_KEY,
+    LOGO_HORIZONTAL_IMAGE_URI_STATE_KEY,
+    LOGO_VERTICAL_IMAGE_URI_STATE_KEY,
     REFERENCE_GUIDELINES_STATE_KEY,
     CHOSEN_VOICEOVER_STYLE_STATE_KEY,
     VOICEOVER_STYLES,
@@ -17,7 +19,7 @@ from ...state import (
 from ...utils.utils_gcs import get_public_url, set_output_folder
 from ...schema import SlidecastStoryboard, SlidecastSlide
 from ...shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
-from ..tools_media import (
+from ..media import (
     _generate_gemini_image,
     _generate_voiceover_audio,
     _generate_lyria_music,
@@ -52,8 +54,16 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
                     raise ValueError(f"Failed to load existing image for slide {idx+1}")
                 return slide, img_res.media_bytes
 
-            # 1. Load brand assets
-            logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+            # 1. Load brand assets based on aspect ratio
+            ar = sb.aspect_ratio
+            if ar == "9:16":
+                logo_uri = tool_context.state.get(LOGO_VERTICAL_IMAGE_URI_STATE_KEY)
+            else:
+                logo_uri = tool_context.state.get(LOGO_HORIZONTAL_IMAGE_URI_STATE_KEY)
+
+            if not logo_uri:
+                logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
+
             ref_guidelines = tool_context.state.get(REFERENCE_GUIDELINES_STATE_KEY, "")
 
             logo_bytes = []
@@ -65,22 +75,28 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
             # 2. Inject guidelines into prompt
             styled_prompt = f"{slide.image_prompt}\n\nREFERENCE BRAND RULES:\n{ref_guidelines[:1000]}"
 
-            # 3. Generate Image with logo reference
+            # 3. Generate Image WITHOUT logo reference to avoid AI logo generation
             ar = sb.aspect_ratio
-            img_bytes = await _generate_gemini_image(styled_prompt, logo_bytes, label=f"slide_{idx+1}_image", aspect_ratio=ar)
+            img_bytes = await _generate_gemini_image(styled_prompt, [], label=f"slide_{idx+1}_image", aspect_ratio=ar)
 
             if not img_bytes:
                 log_message(f"Failed to generate image for slide {idx+1}", Severity.ERROR)
                 raise ValueError(f"Failed to generate image for slide {idx+1}")
 
-            # Save image as artifact
+            # Save clean image as artifact
             img_media = GeneratedMedia(filename=f"slide_{idx+1}.png", mime_type="image/png", media_bytes=img_bytes)
             saved_img = await utils_agents.save_to_artifact_and_render_asset(
                 asset=img_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
             )
             slide.image_url = utils_gcs.normalize_to_gs_bucket_uri(saved_img.gcs_uri)
 
-            return slide, img_bytes
+            # Overlay logo for PDF preview only
+            preview_img_bytes = img_bytes
+            if logo_bytes:
+                from ...shared_infra.utils_media import overlay_logo_on_image
+                preview_img_bytes = overlay_logo_on_image(img_bytes, logo_bytes[0])
+
+            return slide, preview_img_bytes
         except Exception as e:
             log_message(f"Error during image processing for slide {idx+1}: {repr(e)}", Severity.ERROR)
             raise
@@ -313,10 +329,14 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
     music_bytes = await _generate_lyria_music(music_prompt, sb.title)
 
     logo_bytes = None
-    logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
-    
+    ar = sb.aspect_ratio
+    if ar == "9:16":
+        logo_uri = tool_context.state.get(LOGO_VERTICAL_IMAGE_URI_STATE_KEY)
+    else:
+        logo_uri = tool_context.state.get(LOGO_HORIZONTAL_IMAGE_URI_STATE_KEY)
+
     if not logo_uri:
-        logo_uri = ""
+        logo_uri = tool_context.state.get(LOGO_IMAGE_URI_STATE_KEY)
 
     if logo_uri:
         try:

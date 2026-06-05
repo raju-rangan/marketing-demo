@@ -41,7 +41,7 @@ class TrendSpotter:
         )
 
     @log_function_call
-    def search_trends(self, product_category: str, tool_context: ToolContext) -> str:
+    def search_trends(self, tool_context: ToolContext, product_category: str) -> str:
         """Searches the web for current market trends relevant to a product category using Google Search grounding.
 
         Args:
