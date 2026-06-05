@@ -43,7 +43,7 @@ def generate_slide_animation_plan(tool_context: ToolContext, slide_topic: str, d
 
     try:
         response = client.models.generate_content(
-            model="gemini-3.1-pro-preview",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,

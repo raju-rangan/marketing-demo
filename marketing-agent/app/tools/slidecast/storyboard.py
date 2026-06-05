@@ -82,7 +82,7 @@ def generate_slidecast_storyboard(tool_context: ToolContext, urls: List[str] = N
 
     try:
         response = client.models.generate_content(
-            model="gemini-3.1-pro-preview",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,
@@ -156,7 +156,7 @@ def update_slidecast_slide(tool_context: ToolContext, storyboard: dict, slide_in
 
     try:
         response = client.models.generate_content(
-            model="gemini-3.1-pro-preview",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,
@@ -220,7 +220,7 @@ def update_storyboard_visual_style(tool_context: ToolContext, storyboard: dict, 
 
         try:
             response = client.models.generate_content(
-                model="gemini-3.1-pro-preview",
+                model="gemini-3.5-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.7,

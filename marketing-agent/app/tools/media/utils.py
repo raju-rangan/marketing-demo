@@ -53,7 +53,7 @@ def ensure_gs_uri(uri: str) -> str:
         return uri.replace("https://storage.googleapis.com/", "gs://")
     return uri
 
-STORYLINE_MODEL = "gemini-3.1-pro-preview"
+STORYLINE_MODEL = "gemini-3.5-flash"
 
 _VARIATION_STYLES = [
     "PREMIUM STUDIO — Clean white/grey studio with precise product lighting, geometric shadows, ultra-minimal Apple-style composition. The product floats in perfect light.",
