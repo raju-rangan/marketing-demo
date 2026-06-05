@@ -24,7 +24,7 @@ BQ_DATASET: str = os.getenv("BQ_DATASET", "retail_analytics")
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", os.getenv("GOOGLE_CLOUD_REGION", "global"))
 GEMINI_MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
-IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL_NAME", "gemini-3.1-pro-image")
+IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL_NAME", "gemini-3-pro-image-preview")
 
 STANDARD_GENERATION_CONFIG = {
     "response_mime_type": "application/json",
