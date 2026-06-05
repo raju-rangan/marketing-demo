@@ -12,7 +12,7 @@ We had to build a system that acts less like a magic wand and more like a parano
 
 ### Trick #1: Never Let the User Talk to the Image Model
 
-If you give a marketer a raw text box that connects directly to the image generator (`gemini-3.1-pro-image`), they are going to type something vague like, "Show a banker talking to a client." The model will guess the rest. It might make it a cartoon. It might make it hyper-realistic. It's a gamble.
+If you give a marketer a raw text box that connects directly to the image generator (`gemini-3-pro-image`), they are going to type something vague like, "Show a banker talking to a client." The model will guess the rest. It might make it a cartoon. It might make it hyper-realistic. It's a gamble.
 
 To fix this, we introduced an interception layer using **Skills**. 
 
@@ -67,7 +67,7 @@ sb.slides[slide_index].image_url = None
 sb.slides[slide_index].audio_url = None
 ```
 
-When the rendering pipeline spins up, it scans the JSON state. It sees that Slides 1-3 and 5-10 already have valid URLs. It skips them entirely—saving massive API costs and locking in your approved creative—and only triggers the `gemini-3.1-pro-image` generation and `gemini-2.5-flash` judging loops for Slide 4.
+When the rendering pipeline spins up, it scans the JSON state. It sees that Slides 1-3 and 5-10 already have valid URLs. It skips them entirely—saving massive API costs and locking in your approved creative—and only triggers the `gemini-3-pro-image` generation and `gemini-2.5-flash` judging loops for Slide 4.
 
 ### The Takeaway
 
