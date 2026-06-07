@@ -52,11 +52,13 @@ class SlidecastSlide(BaseModel):
     index: int = Field(..., description="The sequence index of the slide.")
     title: str = Field(..., description="The main heading for the slide.")
     content: str = Field(..., description="The bullet points or main body text.")
-    image_prompt: str = Field(..., description="Detailed prompt for generating the slide visual.")
+    image_prompt: str = Field(..., description="Detailed prompt for generating the start visual.")
+    end_image_prompt: Optional[str] = Field(None, description="Detailed prompt for generating the end visual.")
     voiceover_script: str = Field(..., description="The spoken text for this slide.")
     
     # Optional generated asset URIs
-    image_url: Optional[str] = Field(None, description="GCS URI of the generated slide image.")
+    start_image_url: Optional[str] = Field(None, description="GCS URI of the generated start image.")
+    end_image_url: Optional[str] = Field(None, description="GCS URI of the generated end image.")
     audio_url: Optional[str] = Field(None, description="GCS URI of the generated voiceover audio.")
     video_url: Optional[str] = Field(None, description="GCS URI of the generated animation clip.")
 

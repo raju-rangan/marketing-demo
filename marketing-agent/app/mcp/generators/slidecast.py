@@ -164,22 +164,43 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
     
     # 2. Process slides in parallel
     async def _gen_slide_assets(slide: SlidecastSlide):
-        # IMAGE: Skip if already exists
-        if slide.image_url:
-            log_message(f"Slide {slide.index+1}: using existing image.", Severity.INFO)
-            img_bytes = await _download_uri(slide.image_url)
+        # IMAGE (START): Skip if already exists
+        if slide.start_image_url:
+            log_message(f"Slide {slide.index+1}: using existing start image.", Severity.INFO)
+            start_img_bytes = await _download_uri(slide.start_image_url)
         else:
-            log_message(f"Slide {slide.index+1}: generating new image...", Severity.INFO)
+            log_message(f"Slide {slide.index+1}: generating new start image...", Severity.INFO)
             styled_prompt = f"{slide.image_prompt}\n\nREFERENCE BRAND RULES:\n{brand.reference_guidelines[:500]}"
-            img_bytes = await _generate_gemini_image(
+            start_img_bytes = await _generate_gemini_image(
                 styled_prompt, 
                 ref_images, 
-                label=f"slide_{slide.index}", 
+                label=f"slide_{slide.index}_start", 
                 aspect_ratio=manifest.aspect_ratio
             )
-            if img_bytes:
-                url = await _upload_bytes(img_bytes, "mcp_slidecast", f"slide_{slide.index}.png", "image/png")
-                slide.image_url = url
+            if start_img_bytes:
+                url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
+                slide.start_image_url = url
+        
+        # IMAGE (END): Only if requested and not exists
+        end_img_bytes = None
+        if slide.end_image_prompt:
+            if slide.end_image_url:
+                log_message(f"Slide {slide.index+1}: using existing end image.", Severity.INFO)
+                end_img_bytes = await _download_uri(slide.end_image_url)
+            else:
+                log_message(f"Slide {slide.index+1}: generating new end image...", Severity.INFO)
+                # Inject start_img_bytes into the reference list for consistency
+                end_ref_images = ref_images + ([start_img_bytes] if start_img_bytes else [])
+                styled_prompt = f"{slide.end_image_prompt}\n\nREFERENCE BRAND RULES:\n{brand.reference_guidelines[:500]}"
+                end_img_bytes = await _generate_gemini_image(
+                    styled_prompt, 
+                    end_ref_images, 
+                    label=f"slide_{slide.index}_end", 
+                    aspect_ratio=manifest.aspect_ratio
+                )
+                if end_img_bytes:
+                    url = await _upload_bytes(end_img_bytes, "mcp_slidecast", f"slide_{slide.index}_end.png", "image/png")
+                    slide.end_image_url = url
         
         # AUDIO: Skip if already exists
         if slide.audio_url:
@@ -193,7 +214,7 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
                 url = await _upload_bytes(audio_bytes, "mcp_slidecast", f"audio_{slide.index}.wav", "audio/wav")
                 slide.audio_url = url
                 
-        return slide, img_bytes
+        return slide, start_img_bytes, end_img_bytes
 
     results = await asyncio.gather(*[_gen_slide_assets(s) for s in manifest.slides])
     
