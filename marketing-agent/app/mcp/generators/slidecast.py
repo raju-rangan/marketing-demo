@@ -336,7 +336,8 @@ async def update_slide_blueprint(
         voiceover_script=new_data.get("voiceover_script", target_slide.voiceover_script)
     )
     # Clear assets to force regeneration
-    manifest.slides[slide_index].image_url = None
+    manifest.slides[slide_index].start_image_url = None
+    manifest.slides[slide_index].end_image_url = None
     manifest.slides[slide_index].audio_url = None
     manifest.slides[slide_index].video_url = None
     
