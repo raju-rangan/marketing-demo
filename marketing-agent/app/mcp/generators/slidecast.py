@@ -129,8 +129,9 @@ async def generate_slidecast_manifest(
         f"VISUAL STYLE: {slide_style}\n"
         f"STYLE DIRECTIVE: {style_desc}\n\n"
         f"BRAND MANDATE:\n{brand.reference_guidelines[:1000]}\n"
-        f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
-        f"- If animation is requested, include an 'end_image_prompt' that is a subtle variation of the 'image_prompt' to allow for motion.\n\n"
+        # Enable this if you want to enforce logo presence in the image generation step, but it is an issue if you want to enforce strict branding.
+        # f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
+        f"- If animation is requested, include an 'end_image_prompt'. This MUST represent the scene 8 seconds later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
         f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script)."
     )
 

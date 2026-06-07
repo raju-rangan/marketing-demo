@@ -442,8 +442,7 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
 
 def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9") -> bytes | None:
     """
-    Compiles a slidecast video using ffmpeg.
-    ...
+    Compiles a slidecast video using ffmpeg, using the end image as the hold frame.
     """
     if not slides:
         return None
@@ -464,11 +463,16 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
         for i, slide in enumerate(slides):
             # ... (same setup code for aud/img/vid paths)
             img_path = os.path.join(tmpdir, f"img_{i}.png")
+            end_img_path = os.path.join(tmpdir, f"end_img_{i}.png")
             vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
 
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
             with open(img_path, "wb") as f: f.write(slide["image_bytes"])
+            
+            # Use end image if available for padding, otherwise fall back to start image
+            end_bytes = slide.get("end_image_bytes", slide["image_bytes"])
+            with open(end_img_path, "wb") as f: f.write(end_bytes)
 
             aud_dur = get_video_duration(aud_path)
             if aud_dur <= 0:
@@ -488,7 +492,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
                 inputs.extend(["-i", vid_path])
                 if aud_dur > vid_dur:
-                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", img_path])
+                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", end_img_path])
                     img_idx = input_count
                     input_count += 1
                     v_filter = (

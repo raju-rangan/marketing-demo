@@ -27,7 +27,7 @@ class StoryboardManifest(BaseModel):
     voiceover_uri: Optional[str] = Field(None, description="URI of the generated voiceover audio.")
     music_uri: Optional[str] = Field(None, description="URI of the generated background music.")
 
-class RenderJob(BaseModel):
+class what (BaseModel):
     company_name: str = Field(..., description="The brand or company name.")
     product_name: str = Field(..., description="The product name.")
     tagline: str = Field("", description="Marketing tagline for overlays.")

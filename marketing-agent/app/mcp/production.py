@@ -5,7 +5,7 @@ import time
 from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
 
-from .schemas import RenderJob
+from .schemas import RenderJob, SlidecastManifest
 from .assets import _download_uri, _upload_bytes
 from ..utils.media import (
     stitch_videos,
@@ -13,6 +13,7 @@ from ..utils.media import (
     overlay_logo_on_video,
     add_text_overlays,
     add_end_card_overlay,
+    compile_slidecast_video,
     log_message,
     Severity
 )
@@ -96,4 +97,62 @@ def add_production_tools(mcp: FastMCP):
             
         except Exception as e:
             logger.error(f"Failed to produce video asset: {e}")
+            return json.dumps({"status": "error", "details": str(e)})
+
+    @mcp.tool()
+    async def generate_video_from_slidecast(slidecast_json: str) -> str:
+        """
+        Executes a final render job for a Slidecast.
+        Takes a JSON string matching the SlidecastManifest schema.
+        Returns a JSON object with the final stitched MP4 GCS URI.
+        """
+        try:
+            # 1. Parse the strictly typed SlidecastManifest payload
+            manifest = SlidecastManifest.model_validate_json(slidecast_json)
+            
+            logger.info(f"Starting slidecast production: {manifest.title} - {len(manifest.slides)} slides.")
+            
+            # 2. Download all assets (images/audio per slide)
+            download_tasks = []
+            for s in manifest.slides:
+                if s.start_image_url: download_tasks.append(_download_uri(s.start_image_url))
+                if s.end_image_url: download_tasks.append(_download_uri(s.end_image_url))
+                if s.audio_url: download_tasks.append(_download_uri(s.audio_url))
+            
+            results = await asyncio.gather(*download_tasks)
+            
+            # 3. Construct Slide Data
+            results_iter = iter(results)
+            slide_data = []
+            for s in manifest.slides:
+                img_bytes = next(results_iter) if s.start_image_url else b""
+                end_img_bytes = next(results_iter) if s.end_image_url else None
+                aud_bytes = next(results_iter) if s.audio_url else b""
+                
+                slide_data.append({
+                    "image_bytes": img_bytes,
+                    "end_image_bytes": end_img_bytes,
+                    "audio_bytes": aud_bytes,
+                    "text_overlay": s.title
+                })
+            
+            # 4. Compile
+            final_video = compile_slidecast_video(slide_data, aspect_ratio=manifest.aspect_ratio)
+            
+            if not final_video:
+                return json.dumps({"status": "error", "details": "Slidecast rendering failed."})
+
+            # 5. Upload
+            ts = int(time.time() * 1000)
+            filename = f"mcp_slidecast_{ts}.mp4"
+            final_uri = await _upload_bytes(final_video, "mcp_generated", filename, "video/mp4")
+            
+            return json.dumps({
+                "status": "success", 
+                "video_uri": final_uri,
+                "message": "Slidecast production completed successfully."
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to produce slidecast asset: {e}")
             return json.dumps({"status": "error", "details": str(e)})
