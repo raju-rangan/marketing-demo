@@ -96,23 +96,23 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
     
     for i, (img_bytes, audio_bytes) in enumerate(results):
         if img_bytes:
-            uri = await _upload_bytes(img_bytes, "mcp_slidecast_preview", f"slide_{i}_{ts}.png", "image/png")
-            manifest.slides[i].image_uri = uri
+            url = await _upload_bytes(img_bytes, "mcp_slidecast_preview", f"slide_{i}_{ts}.png", "image/png")
+            manifest.slides[i].image_url = url
             slide_images.append(img_bytes)
         else:
             slide_images.append(b"") # Placeholder
             
         if audio_bytes:
-            uri = await _upload_bytes(audio_bytes, "mcp_slidecast_preview", f"audio_{i}_{ts}.wav", "audio/wav")
-            manifest.slides[i].audio_uri = uri
+            url = await _upload_bytes(audio_bytes, "mcp_slidecast_preview", f"audio_{i}_{ts}.wav", "audio/wav")
+            manifest.slides[i].audio_url = url
 
     # 4. Generate PDF
     pdf_content = _generate_approval_pdf(manifest.title, manifest.slides, slide_images)
-    pdf_uri = await _upload_bytes(pdf_content, "mcp_slidecast_preview", f"approval_storyboard_{ts}.pdf", "application/pdf")
+    pdf_url = await _upload_bytes(pdf_content, "mcp_slidecast_preview", f"approval_storyboard_{ts}.pdf", "application/pdf")
     
     return {
         "status": "success",
-        "pdf_uri": pdf_uri,
+        "pdf_url": pdf_url,
         "manifest": manifest.model_dump()
     }
 

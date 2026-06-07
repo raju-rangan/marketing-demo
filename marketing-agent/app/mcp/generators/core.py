@@ -22,11 +22,10 @@ client = genai.Client(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location="glo
 def ensure_gs_uri(uri: str) -> str:
     """Converts authenticated HTTPS URLs back to raw gs:// URIs for the GenAI SDK."""
     if not uri: return uri
-    if uri.startswith("https://storage.cloud.google.com/"):
-        return uri.replace("https://storage.cloud.google.com/", "gs://")
-    if uri.startswith("https://storage.googleapis.com/"):
-        return uri.replace("https://storage.googleapis.com/", "gs://")
-    return uri
+    try:
+        return utils_gcs.normalize_to_gs_bucket_uri(uri)
+    except Exception:
+        return uri
 
 async def _download_uri(uri: str) -> bytes | None:
     """Downloads an asset from a URI (GCS or HTTPS) as bytes."""
@@ -39,15 +38,16 @@ async def _download_uri(uri: str) -> bytes | None:
         return None
 
 async def _upload_bytes(data: bytes, folder: str, filename: str, mime_type: str) -> str:
-    """Uploads raw bytes to GCS and returns the gs:// URI."""
+    """Uploads raw bytes to GCS and returns the public signed URL."""
     blob_path = f"{folder}/{filename}"
-    uri = utils_gcs.upload_to_gcs(
+    gs_uri = utils_gcs.upload_to_gcs(
         bucket_path=GOOGLE_CLOUD_BUCKET_ARTIFACTS, 
         file_bytes=data, 
         destination_blob_name=blob_path,
         metadata={"source": "mcp-generator"}
     )
-    return uri
+    # Ensure every returned link is accessible via a signed URL
+    return utils_gcs.get_public_url(gs_uri)
 
 def _get_brand_wall_directive(company_name: str, guidelines: str = "") -> str:
     """Returns strict exclusionary rules and visual requirements for media models."""

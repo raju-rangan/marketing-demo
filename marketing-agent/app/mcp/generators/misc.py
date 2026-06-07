@@ -67,6 +67,7 @@ async def query_kb(query: str, brand_name: str) -> str:
 
 async def load_brand_context(preset_name: str = None) -> BrandContext:
     """Stateless loader for brand presets."""
+    from ...adk_common.utils import utils_gcs
     active_brand = os.environ.get("ACTIVE_BRAND", "goog")
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     brand_dir = os.path.join(base_dir, "brands", active_brand)
@@ -105,8 +106,8 @@ async def load_brand_context(preset_name: str = None) -> BrandContext:
         return re.sub(r"\{\{([A-Z0-9_]+)\}\}", lambda m: os.environ.get(m.group(1), m.group(0)), text)
 
     # Assets
-    local_logo_path = os.path.join(brand_dir, "assets", "logo.png")
-    logo_uri = local_logo_path if os.path.exists(local_logo_path) else resolve_placeholders(preset.get("logo_uri", ""))
+    raw_logo_uri = resolve_placeholders(preset.get("logo_uri", ""))
+    logo_uri = utils_gcs.get_public_url(raw_logo_uri) if raw_logo_uri else None
     
     visual_identity = resolve_placeholders(preset.get("visual_identity", ""))
     exclusion_rules = resolve_placeholders(preset.get("exclusion_rules", ""))
@@ -126,6 +127,7 @@ async def load_brand_context(preset_name: str = None) -> BrandContext:
 
 async def register_assets_stateless(existing_uris: List[str], new_uris: List[str]) -> dict:
     """Stateless logic for registering new asset uploads."""
+    from ...adk_common.utils import utils_gcs
     registry_uris = set(existing_uris)
     new_registrations = []
     
@@ -136,7 +138,9 @@ async def register_assets_stateless(existing_uris: List[str], new_uris: List[str
         if uri not in registry_uris:
             counter += 1
             tag = f"upload-{counter}"
-            new_registrations.append({"tag": tag, "uri": uri})
+            # Ensure every registered link is accessible via a signed URL
+            public_uri = utils_gcs.get_public_url(uri)
+            new_registrations.append({"tag": tag, "uri": public_uri})
             
     return {"status": "success", "new_registrations": new_registrations}
 

@@ -102,7 +102,7 @@ def add_slidecast_tools(mcp: FastMCP):
             return json.dumps({
                 "status": "success",
                 "message": "Asset generation complete. Please review the consolidated Approval PDF below.",
-                "approval_pdf_url": result["pdf_uri"],
+                "approval_pdf_url": result["pdf_url"],
                 "updated_manifest_json": json.dumps(result["manifest"]) # Stringified to prevent ADK from rendering sub-images
             }, indent=2)
             
