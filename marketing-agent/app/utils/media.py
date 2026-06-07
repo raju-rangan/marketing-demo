@@ -353,7 +353,6 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
         font_path = get_font_path()
         font_str = f":fontfile='{font_path}'" if font_path else ""
         
-        
         # Company Name (appears at 1s, fades in)
         safe_company = escape_ffmpeg_text(company_name)
         filters.append(

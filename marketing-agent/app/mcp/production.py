@@ -7,12 +7,14 @@ from mcp.server.fastmcp import FastMCP
 
 from .schemas import RenderJob
 from .assets import _download_uri, _upload_bytes
-from ..shared_infra.utils_media import (
+from ..utils.media import (
     stitch_videos,
     mix_audio_onto_video,
     overlay_logo_on_video,
     add_text_overlays,
     add_end_card_overlay,
+    log_message,
+    Severity
 )
 
 logger = logging.getLogger(__name__)
