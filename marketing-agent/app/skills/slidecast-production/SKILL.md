@@ -49,7 +49,8 @@ When the user asks to create an educational video, a "Slidecast," or short-form 
 5. **Asset Preview (MANDATORY)**: 
    - Once the user approves the text-based plan, call `preview_slidecast_assets(storyboard=...)`.
    - This will generate the **actual images (infographics)** and **audio clips** for every slide, and compile them into an Approval PDF.
-   - You MUST present the generated PDF URL to the user for approval: "Here is the PDF containing the generated infographics and the final talk tracks. Please review it for visual accuracy and tone before we render the final video."
+   - **OUTPUT RESTRICTION**: You MUST NOT display individual image links, markdown images, or audio links in your text response.
+   - You MUST present ONLY the generated PDF URL to the user for approval: "Here is the PDF containing the generated infographics and the final talk tracks. Please review it for visual accuracy and tone before we render the final video."
 6. **Updating Previewed Assets**:
    - If the user reviews the PDF and asks to change a specific slide's image or audio, use the `update_slidecast_slide` tool.
    - After updating, you MUST call `preview_slidecast_assets` again to regenerate the PDF so they can verify the fix.
