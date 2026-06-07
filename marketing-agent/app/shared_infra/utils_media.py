@@ -19,6 +19,7 @@ import time
 from typing import Optional
 import shutil
 import logging
+import sys
 from enum import Enum
 
 import imageio_ffmpeg
@@ -33,7 +34,12 @@ class Severity(Enum):
     ERROR = logging.ERROR
 
 def log_message(msg: str, severity: Severity = Severity.INFO):
-    logging.log(severity.value, msg)
+    """Logs a message, redirecting to stderr if in MCP mode."""
+    formatted = f"[{severity.name}] [utils_media] {msg}"
+    if os.environ.get("VERBOSE_MODE") == "True" or severity == Severity.ERROR:
+        print(formatted, file=sys.stderr, flush=True)
+    else:
+        print(formatted, flush=True)
 
 # FFmpeg / FFprobe path discovery using imageio-ffmpeg
 try:
@@ -322,24 +328,29 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
 
         # Drawtext filters for Company (top left), Tagline (bottom center), and Price (top right)
         filters = []
+        font_path = get_font_path()
+        font_str = f":fontfile='{font_path}'" if font_path else ""
         
         # Company Name (appears at 1s, fades in)
+        safe_company = escape_ffmpeg_text(company_name)
         filters.append(
-            f"drawtext=text='{company_name}':fontcolor=white:fontsize=48:x=40:y=40:"
+            f"drawtext=text='{safe_company}':fontcolor=white:fontsize=48:x=40:y=40{font_str}:"
             f"enable='between(t,1,{video_duration})':alpha='if(lt(t,2),t-1,1)'"
         )
         
         # Product Name (bottom left)
         if product_name:
+            safe_product = escape_ffmpeg_text(product_name)
             filters.append(
-                f"drawtext=text='{product_name}':fontcolor=white:fontsize=36:x=40:y=h-80:"
+                f"drawtext=text='{safe_product}':fontcolor=white:fontsize=36:x=40:y=h-80{font_str}:"
                 f"enable='between(t,2,{video_duration})'"
             )
 
         # Tagline (center, appears later)
         if tagline:
+            safe_tagline = escape_ffmpeg_text(tagline)
             filters.append(
-                f"drawtext=text='{tagline}':fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2+100:"
+                f"drawtext=text='{safe_tagline}':fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2+100{font_str}:"
                 f"enable='between(t,4,{video_duration})':alpha='if(lt(t,5),t-4,1)'"
             )
 
@@ -350,10 +361,16 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
         ]
         try:
             if not filters: return video_bytes
+            log_message(f"Running text overlay: {' '.join(cmd)}", Severity.INFO)
             subprocess.run(cmd, check=True, capture_output=True)
             with open(v_out, "rb") as f:
                 return f.read()
-        except Exception:
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode() if e.stderr else str(e)
+            log_message(f"FFmpeg text overlay failed: {err_msg}", Severity.ERROR)
+            return video_bytes
+        except Exception as e:
+            log_message(f"Text overlay error: {e}", Severity.ERROR)
             return video_bytes
 
 def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, product_price: str = "") -> bytes:
