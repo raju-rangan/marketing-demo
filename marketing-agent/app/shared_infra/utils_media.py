@@ -58,6 +58,28 @@ if not FFPROBE_EXE:
         # We will use FFMPEG_EXE as a fallback for FFPROBE_EXE tasks in our code
         FFPROBE_EXE = None
 
+def get_font_path() -> str:
+    """Returns a valid font path for drawtext, optimized for macOS."""
+    paths = [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", # Linux
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return ""
+
+def escape_ffmpeg_text(text: str) -> str:
+    """Escapes special characters for FFmpeg's drawtext filter."""
+    if not text: return ""
+    # Replace single backslash with four (FFmpeg requirement)
+    text = text.replace("\\", "\\\\\\\\")
+    # Escape single quotes, colons, and percent signs
+    text = text.replace("'", "'\\\\\\''").replace(":", "\\:").replace("%", "\\%")
+    return text
+
 def get_video_duration(video_path: str) -> float:
     """Gets duration of a video or audio file using ffprobe or ffmpeg fallback."""
     if FFPROBE_EXE:
