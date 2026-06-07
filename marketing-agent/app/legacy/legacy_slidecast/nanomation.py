@@ -3,12 +3,13 @@ import json
 import time
 from google.adk.tools.tool_context import ToolContext
 from ...adk_common.dtos.generated_media import GeneratedMedia
-from ...adk_common.utils import utils_agents, utils_gcs
+from .. import legacy_adk_utils as adk_utils, legacy_utils_agents as utils_agents
+from ...adk_common.utils import utils_gcs
 from ...adk_common.utils.utils_logging import Severity, log_message
 from ...state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
 )
-from ...utils.utils_gcs import get_public_url, set_output_folder
+from ...adk_common.utils.utils_gcs import get_public_url, set_output_folder
 from ...schema import NanomationPlan
 from ..tools_media import _generate_gemini_image, _generate_single_veo_clip
 from .utils import client, types
@@ -119,7 +120,7 @@ async def execute_slide_animation(tool_context: ToolContext, animation_plan: dic
         return {"status": "error", "details": "Failed to stitch video clips."}
         
     final_media = GeneratedMedia(filename=f"nanomation_stitched_{int(time.time())}.mp4", mime_type="video/mp4", media_bytes=stitched_video)
-    saved_final = await utils_agents.save_to_artifact_and_render_asset(
+    saved_final = await adk_utils.save_to_artifact_and_render_asset(
         asset=final_media, context=tool_context, save_in_gcs=True, save_in_artifacts=False, gcs_folder=current_output_folder
     )
     

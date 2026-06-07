@@ -19,6 +19,14 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+from .mcp.schemas import (
+    SlidecastSlide,
+    SlidecastManifest as SlidecastStoryboard,
+    NanomationPhase,
+    NanomationPlan,
+)
+
+
 class CoreIdentifiers(BaseModel):
     sku: str
     upc: Optional[str] = None
@@ -137,39 +145,6 @@ class ProductTrendMapping(BaseModel):
 class TrendSpotterOutput(BaseModel):
     trends: List[Trend]
 
-class Scene(BaseModel):
-    scene_id: int
-    scene_url: str
-    scene_video_url: Optional[str] = None
-    setting: str
-    lighting_style: str
-    camera_movement: str
-    styling_details: str
-    action: str
-
-class CreativeDirection(BaseModel):
-    creative_direction_summary: str
-    scenes: List[Scene]
-
-class FinalAd(BaseModel):
-    final_ad_url: Optional[str] = None
-    final_social_ad_url: Optional[str] = None
-    asset_sheet_url: Optional[str] = None
-    moodboard_url: Optional[str] = None
-    creative_direction: Optional[CreativeDirection] = None
-
-class CampaignDraft(BaseModel):
-    campaign_name: str
-    trend: str
-    target_audience: str
-    keyframes: List[str]
-    video_url: Optional[str] = None
-
-class TrendStrategy(BaseModel):
-    trend_name: str
-    strategy_directive: str
-    target_audience: str
-
 class BrandCore(BaseModel):
     archetype: Optional[str] = None
     mantra: Optional[str] = None
@@ -233,35 +208,5 @@ class Brand(BaseModel):
     voice_and_tone: VoiceAndTone
     social_media_model: Optional[SocialAIModel] = None
 
-
-class SlidecastSlide(BaseModel):
-    slide_title: Optional[str] = None
-    image_prompt: str
-    script: str
-    text_overlay: Optional[str] = None
-    image_url: Optional[str] = None
-    audio_url: Optional[str] = None
-    video_url: Optional[str] = None
-
-class SlidecastStoryboard(BaseModel):
-    title: str
-    slides: List[SlidecastSlide]
-    music_prompt: Optional[str] = "Cinematic and educational background music"
-    video_url: Optional[str] = None
-    aspect_ratio: str
-
-class NanomationPhase(BaseModel):
-    description: str
-    image_prompt: str
-    motion_prompt: Optional[str] = "Cinematic smooth motion"
-    duration_seconds: Optional[int] = 4
-    image_url: Optional[str] = None
-    video_url: Optional[str] = None
-
-class NanomationPlan(BaseModel):
-    target: str
-    progression_type: str = "linear"
-    phases: List[NanomationPhase]
-    topic: str
 
 

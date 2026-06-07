@@ -30,12 +30,12 @@ from ..state import (
     GOOGLE_CLOUD_BUCKET_ARTIFACTS,
     AGENT_VERSION,
 )
-from ..utils.campaign_utils import (
+from .legacy_campaign_utils import (
     Campaign,
     parse_campaigns_from_xml,
 )
-from ..utils.generate_campaigns import generate_campaigns_xml
-from ..utils.utils_gcs import set_output_folder
+from .legacy_generate_campaigns import generate_campaigns_xml
+from ..adk_common.utils.utils_gcs import set_output_folder
 
 # Internal cache for campaigns
 _CACHED_CAMPAIGNS_LIST: list[Campaign] | None = None

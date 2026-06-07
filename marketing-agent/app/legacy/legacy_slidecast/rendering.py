@@ -5,7 +5,8 @@ from typing import List
 
 from google.adk.tools.tool_context import ToolContext
 from ...adk_common.dtos.generated_media import GeneratedMedia
-from ...adk_common.utils import utils_agents, utils_gcs
+from .. import legacy_adk_utils as adk_utils, legacy_utils_agents as utils_agents
+from ...adk_common.utils import utils_gcs
 from ...adk_common.utils.utils_logging import Severity, log_message, stream_status
 from ...state import (
     LOGO_IMAGE_URI_STATE_KEY,
@@ -14,7 +15,7 @@ from ...state import (
     VOICEOVER_STYLES,
     LLM_GEMINI_MODEL_MARKETING_ANALYST,
 )
-from ...utils.utils_gcs import get_public_url, set_output_folder
+from ...adk_common.utils.utils_gcs import get_public_url, set_output_folder
 from ...schema import SlidecastStoryboard, SlidecastSlide
 from ...shared_infra.utils_media import compile_slidecast_video, mix_audio_onto_video, overlay_logo_on_video
 from ..tools_media import (
@@ -58,7 +59,7 @@ async def preview_slidecast_assets(tool_context: ToolContext, storyboard: dict) 
 
             logo_bytes = []
             if logo_uri:
-                lres = await utils_agents.load_resource(logo_uri, tool_context)
+                lres = await adk_utils.load_resource(logo_uri, tool_context)
                 if lres:
                     logo_bytes = [lres.media_bytes]
 
@@ -320,7 +321,7 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
 
     if logo_uri:
         try:
-            res = await utils_agents.load_resource(logo_uri, tool_context)
+            res = await adk_utils.load_resource(logo_uri, tool_context)
             if res: logo_bytes = res.media_bytes
         except Exception: pass
 
@@ -349,3 +350,4 @@ async def finalize_slidecast_video(tool_context: ToolContext, storyboard: dict, 
         "storyboard": sb.model_dump(),
         "details": "Slidecast masterclass finalized and ready for viewing."
     }
+ }

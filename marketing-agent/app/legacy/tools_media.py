@@ -54,7 +54,7 @@ from ..state import (
     VOICEOVER_STYLES,
     CHOSEN_VOICEOVER_STYLE_STATE_KEY,
 )
-from ..utils.utils_gcs import get_public_url, set_output_folder
+from ..adk_common.utils.utils_gcs import get_public_url, set_output_folder
 from ..shared_infra.utils_media import (
     stitch_videos,
     stitch_images,

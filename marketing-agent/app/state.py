@@ -14,16 +14,30 @@
 
 import os
 import shutil
-import imageio_ffmpeg
 from .adk_common.utils.constants import (
     get_optional_env_var,
     get_required_env_var,
 )
 
 # ============================================================
+# Model Configuration (Load first to avoid import issues)
+# ============================================================
+
+GEMINI_IMAGE_MODEL = get_required_env_var("IMAGE_GENERATION_MODEL")
+GEMINI_TTS_MODEL = get_required_env_var("AUDIO_TTS_GENERATION_MODEL")
+GEMINI_TTS_VOICE = get_required_env_var("AUDIO_TTS_VOICE_NAME")
+VEO_MODEL = get_required_env_var("VIDEO_GENERATION_MODEL")
+VEO_CLIP_DURATION = int(get_optional_env_var("VIDEO_DEFAULT_DURATION", "4"))
+LLM_GEMINI_MODEL_MARKETING_ANALYST = get_required_env_var("LLM_GEMINI_MODEL_MARKETING_ANALYST")
+STORYLINE_MODEL = get_optional_env_var("STORYLINE_MODEL", "gemini-3.1-pro-preview")
+ROOT_AGENT_MODEL = get_optional_env_var("ROOT_AGENT_MODEL", "gemini-3-flash-preview")
+LYRIA_MODEL = get_optional_env_var("LYRIA_MODEL", "lyria-3-pro-preview")
+
+# ============================================================
 # Environment Configuration
 # ============================================================
 
+import imageio_ffmpeg
 # FFmpeg / FFprobe path discovery
 try:
     FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
@@ -44,13 +58,6 @@ GOOGLE_CLOUD_PROJECT = get_required_env_var("GOOGLE_CLOUD_PROJECT")
 GOOGLE_CLOUD_LOCATION = get_required_env_var("GOOGLE_CLOUD_LOCATION")
 GOOGLE_CLOUD_BUCKET_ARTIFACTS = get_required_env_var("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
 
-GEMINI_IMAGE_MODEL = get_required_env_var("IMAGE_GENERATION_MODEL")
-GEMINI_TTS_MODEL = get_required_env_var("AUDIO_TTS_GENERATION_MODEL")
-GEMINI_TTS_VOICE = get_required_env_var("AUDIO_TTS_VOICE_NAME")
-VEO_MODEL = get_required_env_var("VIDEO_GENERATION_MODEL")
-VEO_CLIP_DURATION = int(get_optional_env_var("VIDEO_DEFAULT_DURATION", "4"))
-LLM_GEMINI_MODEL_MARKETING_ANALYST = get_required_env_var("LLM_GEMINI_MODEL_MARKETING_ANALYST")
-LYRIA_MODEL = get_optional_env_var("LYRIA_MODEL", "lyria-3-pro-preview")
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
 DEMO_COMPANY_NAME = get_optional_env_var("DEMO_COMPANY_NAME", "LayoGenMedia")
 MARKETING_ANALYST_DATASTORE_CLOUD_BUCKET = get_required_env_var("MARKETING_ANALYST_DATASTORE_CLOUD_BUCKET")

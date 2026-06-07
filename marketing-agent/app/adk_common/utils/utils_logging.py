@@ -18,6 +18,7 @@ import asyncio
 import enum
 import functools
 import inspect
+import os
 import sys
 import time
 from typing import Optional
@@ -73,10 +74,10 @@ def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
     formatted_message += f" [{AGENT_VERSION}]"
     formatted_message += f" {message}"
 
-    if severity == Severity.ERROR:
-        print(formatted_message, file=sys.stderr)
+    if severity == Severity.ERROR or os.environ.get("VERBOSE_MODE") == "True":
+        print(formatted_message, file=sys.stderr, flush=True)
     else:
-        print(formatted_message, file=sys.stdout)
+        print(formatted_message, file=sys.stdout, flush=True)
 
 from google.genai import types
 
@@ -121,7 +122,11 @@ def log_status(message: str, tool_context: Optional[ToolContext] = None):
         message: The status message to display in the UI.
         tool_context: Optional ToolContext to update the UI state.
     """
-    print(f"ui:status_update {message}", flush=True)
+    if os.environ.get("VERBOSE_MODE") == "True":
+        print(f"ui:status_update {message}", file=sys.stderr, flush=True)
+    else:
+        print(f"ui:status_update {message}", flush=True)
+
     if tool_context:
         tool_context.state[CONTEXT_UI_PREFIX] = message
 
