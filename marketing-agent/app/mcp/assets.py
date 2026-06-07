@@ -85,10 +85,11 @@ def add_asset_tools(mcp: FastMCP):
         """
         try:
             async def _gen_video(idx, motion, start_uri):
-                # We just pass the URI to _generate_single_veo_clip, which handles its own resolution
+                # Pass start_uri as both start and end frame for stable interpolation
                 vid_bytes = await _generate_single_veo_clip(
                     prompt=motion,
                     start_frame_gcs_uri=start_uri,
+                    end_frame_gcs_uri=start_uri,
                     clip_duration=clip_duration_seconds,
                     label=f"mcp_clip_{idx}",
                     aspect_ratio=aspect_ratio
