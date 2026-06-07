@@ -28,7 +28,7 @@ def add_production_tools(mcp: FastMCP):
         """
         try:
             # 1. Parse the strictly typed RenderJob payload
-            job = RenderJ/ob.model_validate_json(render_job_json)
+            job = RenderJob.model_validate_json(render_job_json)
             
             logger.info(f"Starting production for {job.company_name} - {len(job.video_clip_uris)} clips.")
             

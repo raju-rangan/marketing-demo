@@ -13,7 +13,8 @@ def _sanitize_veo_prompt(prompt: str) -> str:
 async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
                                      clip_duration: int = 6, end_frame_gcs_uri: str | None = None,
                                      label: str = "clip", aspect_ratio: str = "16:9") -> bytes | None:
-    log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s", Severity.INFO)
+    """Generates a video clip using VEO, supporting long polling for production quality."""
+    log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s | Aspect: {aspect_ratio}", Severity.INFO)
     log_message(f"📝 [VEO GEN PROMPT]: {prompt}", Severity.INFO)
     log_message(f"🖼️ [VEO GEN START FRAME]: {start_frame_gcs_uri}", Severity.INFO)
     
@@ -23,13 +24,15 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
         last_frame = types.Image(gcs_uri=ensure_gs_uri(end_frame_gcs_uri), mime_type=img_mime) if end_frame_gcs_uri else None
 
         veo_config = types.GenerateVideosConfig(
-            number_of_videos=1, duration_seconds=clip_duration, aspect_ratio=aspect_ratio,
+            number_of_videos=1, 
+            duration_seconds=clip_duration, 
+            aspect_ratio=aspect_ratio,
             last_frame=last_frame,
             generate_audio=False,
             person_generation="allow_all",
         )
 
-        log_message(f"VEO {label} ({mode}): submitting {clip_duration}s clip...", Severity.INFO)
+        log_message(f"VEO {label} ({mode}): submitting job...", Severity.INFO)
 
         operation = None
         for veo_attempt in range(3):
@@ -51,15 +54,18 @@ async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
         if not operation:
             return None
 
-        # Source Polling Pipeline
-        for poll in range(80):
+        # Source Polling Pipeline: Increase to 120 polls (20 minutes max) to support heavy generation
+        for poll in range(120):
             if operation.done:
                 break
+            # Status update every 30s
+            if poll % 3 == 0:
+                log_message(f"VEO {label}: still processing (poll {poll+1}/120)...", Severity.INFO)
             await asyncio.sleep(10)
             operation = client.operations.get(operation)
 
         if not operation.done or operation.error:
-            log_message(f"VEO {label} failed: {operation.error if operation.error else 'Timeout'}", Severity.ERROR)
+            log_message(f"VEO {label} failed: {operation.error if operation.error else 'Timeout after 20 mins'}", Severity.ERROR)
             return None
 
         if not operation.response or not operation.response.generated_videos:
