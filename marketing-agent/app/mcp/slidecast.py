@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
 from .schemas import SlidecastManifest, BrandContext, NanomationPlan
 from .generators.slidecast import generate_slidecast_manifest, update_slide_blueprint, plan_slide_animation, preview_slidecast_assets
