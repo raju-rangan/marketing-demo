@@ -76,20 +76,22 @@ def add_asset_tools(mcp: FastMCP):
     async def create_video_assets(
         motion_prompts: List[str],
         start_frame_uris: List[str],
-        clip_duration_seconds: int = 6,
+        end_frame_uris: Optional[List[str]] = None,
+        clip_duration_seconds: int = 8,
         aspect_ratio: str = "16:9"
     ) -> str:
         """
-        Generates high-fidelity video clips using VEO based on motion prompts and start frames.
+        Generates high-fidelity video clips using VEO based on motion prompts and frame pairs.
         Returns a JSON list of generated MP4 GCS URIs.
         """
         try:
-            async def _gen_video(idx, motion, start_uri):
-                # Pass start_uri as both start and end frame for stable interpolation
+            async def _gen_video(idx, motion, start_uri, end_uri):
+                # Use provided end_uri or fallback to start_uri for stability
+                target_end_uri = end_uri if end_uri else start_uri
                 vid_bytes = await _generate_single_veo_clip(
                     prompt=motion,
                     start_frame_gcs_uri=start_uri,
-                    end_frame_gcs_uri=start_uri,
+                    end_frame_gcs_uri=target_end_uri,
                     clip_duration=clip_duration_seconds,
                     label=f"mcp_clip_{idx}",
                     aspect_ratio=aspect_ratio
@@ -99,7 +101,10 @@ def add_asset_tools(mcp: FastMCP):
                     return await _upload_bytes(vid_bytes, "mcp_generated", f"clip_{idx}_{ts}.mp4", "video/mp4")
                 return None
 
-            results = await asyncio.gather(*[_gen_video(i, p, start_frame_uris[i]) for i, p in enumerate(motion_prompts)])
+            # Prepare end_frame_uris list with Nones if shorter than start_frame_uris
+            end_uris = end_frame_uris if end_frame_uris else [None] * len(start_frame_uris)
+            
+            results = await asyncio.gather(*[_gen_video(i, p, start_frame_uris[i], end_uris[i]) for i, p in enumerate(motion_prompts)])
             uris = [u for u in results if u]
             
             return json.dumps({"status": "success", "video_uris": uris})

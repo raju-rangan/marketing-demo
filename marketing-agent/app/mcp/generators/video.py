@@ -11,7 +11,7 @@ def _sanitize_veo_prompt(prompt: str) -> str:
     return prompt.replace("\n", " ").strip()[:2000]
 
 async def _generate_single_veo_clip(prompt: str, start_frame_gcs_uri: str,
-                                     clip_duration: int = 6, end_frame_gcs_uri: str | None = None,
+                                     clip_duration: int = 8, end_frame_gcs_uri: str | None = None,
                                      label: str = "clip", aspect_ratio: str = "16:9") -> bytes | None:
     """Generates a video clip using VEO, supporting long polling for production quality."""
     log_message(f"📹 [VEO GEN ARGS] Label: {label} | Duration: {clip_duration}s | Aspect: {aspect_ratio}", Severity.INFO)
