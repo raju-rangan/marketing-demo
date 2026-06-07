@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # Private Helpers (Lost Nuances Restoration)
 # ============================================================
 
-def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_images: List[bytes]) -> bytes:
-    """Generates a professional PDF for asset approval."""
+def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_images: List[tuple[bytes, bytes]]) -> bytes:
+    """Generates a professional PDF for asset approval, displaying both start and end frames."""
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
@@ -43,7 +43,7 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
     pdf.ln(10)
 
     # Add Slides
-    for i, (slide, img_bytes) in enumerate(zip(slides, slide_images)):
+    for i, (slide, (start_img, end_img)) in enumerate(zip(slides, slide_images)):
         if i % 2 == 0 and i > 0:
             pdf.add_page()
         
@@ -52,31 +52,36 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
         pdf.cell(0, 10, f"Slide {i+1}", ln=True)
         pdf.ln(5)
         
-        # Add Image
-        temp_img_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
-                temp_file.write(img_bytes)
-                temp_img_path = temp_file.name
-            
-            pdf.image(temp_img_path, x=15, w=100)
-        except Exception as e:
-            log_message(f"Error adding image to PDF: {repr(e)}", Severity.ERROR)
-            # Add text placeholder if image fails
-            pdf.set_font("helvetica", "I", 10)
-            pdf.cell(0, 10, "[Image Render Error]", ln=True)
-        finally:
-            if temp_img_path and os.path.exists(temp_img_path):
-                os.remove(temp_img_path)
-        
+        # Helper to render an image
+        def _render_image(img_bytes, label):
+            temp_img_path = None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                    temp_file.write(img_bytes)
+                    temp_img_path = temp_file.name
+                pdf.set_font("helvetica", "I", 10)
+                pdf.cell(0, 5, label, ln=True)
+                pdf.image(temp_img_path, x=15, w=80)
+                pdf.ln(5)
+            finally:
+                if temp_img_path and os.path.exists(temp_img_path):
+                    os.remove(temp_img_path)
+
+        # Render Images
+        if start_img:
+            _render_image(start_img, "Start Frame:")
+        if end_img:
+            _render_image(end_img, "End Frame:")
         pdf.ln(5)
         pdf.set_font("helvetica", "B", 12)
         pdf.set_text_color(0, 0, 0)
         pdf.cell(0, 10, "Talk Track:", ln=True)
         pdf.set_font("helvetica", "", 11)
         pdf.set_text_color(68, 68, 68)
-        pdf.multi_cell(0, 6, slide.voiceover_script)
-        pdf.ln(15)
+        # Sanitize text to remove non-ASCII characters (e.g., em-dash)
+        safe_text = slide.voiceover_script.replace("—", "-").encode("latin-1", "ignore").decode("latin-1")
+        pdf.multi_cell(0, 6, safe_text)
+        pdf.ln(10)
 
     return pdf.output()
 
@@ -223,7 +228,7 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
     
     # 3. Compile PDF
     updated_slides = [r[0] for r in results]
-    slide_images = [r[1] or b"" for r in results]
+    slide_images = [(r[1] or b"", r[2] or b"") for r in results]
     manifest.slides = updated_slides
     
     pdf_content = _generate_approval_pdf(manifest.title, manifest.slides, slide_images)

@@ -89,7 +89,7 @@ def add_slidecast_tools(mcp: FastMCP):
             return json.dumps({"status": "error", "details": str(e)})
 
     @mcp.tool()
-    async def preview_slidecast_assets(manifest_json: str, reference_guidelines: str = "") -> str:
+    async def preview_slidecast(manifest_json: str, reference_guidelines: str = "") -> str:
         """
         Generates the actual visual and audio assets for a slidecast manifest and compiles them into an Approval PDF.
         Returns the PDF link as the primary result.
