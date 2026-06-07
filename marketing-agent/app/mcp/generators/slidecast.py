@@ -124,8 +124,9 @@ async def generate_slidecast_manifest(
         f"VISUAL STYLE: {slide_style}\n"
         f"STYLE DIRECTIVE: {style_desc}\n\n"
         f"BRAND MANDATE:\n{brand.reference_guidelines[:1000]}\n"
-        f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n\n"
-        f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, voiceover_script)."
+        f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
+        f"- If animation is requested, include an 'end_image_prompt' that is a subtle variation of the 'image_prompt' to allow for motion.\n\n"
+        f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script)."
     )
 
     response = await _retry_generate_content(
@@ -180,7 +181,8 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
             if start_img_bytes:
                 url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
                 slide.start_image_url = url
-        
+                log_message(f"🏳️ Slide {slide.index+1} START IMAGE: {url}", Severity.INFO)
+
         # IMAGE (END): Only if requested and not exists
         end_img_bytes = None
         if slide.end_image_prompt:
@@ -201,6 +203,7 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
                 if end_img_bytes:
                     url = await _upload_bytes(end_img_bytes, "mcp_slidecast", f"slide_{slide.index}_end.png", "image/png")
                     slide.end_image_url = url
+                    log_message(f"🏁 Slide {slide.index+1} END IMAGE: {url}", Severity.INFO)
         
         # AUDIO: Skip if already exists
         if slide.audio_url:
