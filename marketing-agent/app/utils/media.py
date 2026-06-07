@@ -492,25 +492,27 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
                 inputs.extend(["-i", vid_path])
                 if aud_dur > vid_dur:
-                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", end_img_path])
+                    inputs.extend(["-loop", "1", "-t", str(max(0, aud_dur - vid_dur)), "-i", end_img_path])
                     img_idx = input_count
                     input_count += 1
+                    # Ensure video is scaled to canvas, then concat with end image hold
                     v_filter = (
                         f"[{v_idx}:v]{canvas_str}[v_vid_{i}];"
                         f"[{img_idx}:v]{canvas_str}[v_img_{i}];"
-                        f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                        f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0[v{i}];"
                     )
                 else:
-                    v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                    # Video is long enough, just scale it
+                    v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS[v{i}];"
             else:
+                # Image-only slide, loop for duration
                 inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
-                v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
+                v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS[v{i}];"
 
             if text:
-                v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
+                # Add text overlay to the visual output stream
+                v_filter = v_filter.replace(f"[v{i}];", f",drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200{font_str}[v{i}];")
 
-            v_filter = v_filter.rstrip(",")
-            v_filter += f"[v{i}];"
             filter_complex.append(v_filter)
 
             inputs.extend(["-i", aud_path])

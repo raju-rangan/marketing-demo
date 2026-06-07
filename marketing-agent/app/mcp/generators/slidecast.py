@@ -91,12 +91,14 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
 
 async def generate_slidecast_manifest(
     brand: BrandContext,
+    slide_style: str,
+    animate_slides: bool,
+    voiceover_style: str,
     urls: List[str] = None,
     trend_context: str = "",
     duration_seconds: int = 300,
     language: str = "English",
-    aspect_ratio: str = "16:9",
-    slide_style: str = "Documentary Realism"
+    aspect_ratio: str = "16:9"
 ) -> SlidecastManifest:
     """
     Stateless generator for a slidecast presentation blueprint.
@@ -131,7 +133,7 @@ async def generate_slidecast_manifest(
         f"BRAND MANDATE:\n{brand.reference_guidelines[:1000]}\n"
         # Enable this if you want to enforce logo presence in the image generation step, but it is an issue if you want to enforce strict branding.
         # f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
-        f"- If animation is requested, include an 'end_image_prompt'. This MUST represent the scene 8 seconds later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
+        f"- If animation is requested, include an 'end_image_prompt'. This MUST represent the scene 5 minutes later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
         f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script)."
     )
 

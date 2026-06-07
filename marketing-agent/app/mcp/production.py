@@ -112,11 +112,12 @@ def add_production_tools(mcp: FastMCP):
             
             logger.info(f"Starting slidecast production: {manifest.title} - {len(manifest.slides)} slides.")
             
-            # 2. Download all assets (images/audio per slide)
+            # 2. Download all assets (images, video, audio per slide)
             download_tasks = []
             for s in manifest.slides:
                 if s.start_image_url: download_tasks.append(_download_uri(s.start_image_url))
                 if s.end_image_url: download_tasks.append(_download_uri(s.end_image_url))
+                if s.video_url: download_tasks.append(_download_uri(s.video_url))
                 if s.audio_url: download_tasks.append(_download_uri(s.audio_url))
             
             results = await asyncio.gather(*download_tasks)
@@ -127,11 +128,13 @@ def add_production_tools(mcp: FastMCP):
             for s in manifest.slides:
                 img_bytes = next(results_iter) if s.start_image_url else b""
                 end_img_bytes = next(results_iter) if s.end_image_url else None
+                vid_bytes = next(results_iter) if s.video_url else None
                 aud_bytes = next(results_iter) if s.audio_url else b""
                 
                 slide_data.append({
                     "image_bytes": img_bytes,
                     "end_image_bytes": end_img_bytes,
+                    "video_bytes": vid_bytes,
                     "audio_bytes": aud_bytes,
                     "text_overlay": s.title
                 })

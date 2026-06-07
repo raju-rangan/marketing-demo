@@ -27,7 +27,7 @@ class StoryboardManifest(BaseModel):
     voiceover_uri: Optional[str] = Field(None, description="URI of the generated voiceover audio.")
     music_uri: Optional[str] = Field(None, description="URI of the generated background music.")
 
-class what (BaseModel):
+class RenderJob(BaseModel):
     company_name: str = Field(..., description="The brand or company name.")
     product_name: str = Field(..., description="The product name.")
     tagline: str = Field("", description="Marketing tagline for overlays.")
@@ -71,8 +71,8 @@ class SlidecastManifest(BaseModel):
     
     # Global Style Configuration
     slide_style: str = Field("Documentary Realism", description="Visual style name.")
-    voiceover_style: str = Field("Professional & Trustworthy", description="Voiceover persona name.")
-    animate_slides: bool = Field(False, description="Whether to animate frames using VEO.")
+    voiceover_style: str = Field("Puck", description="Voiceover persona name.")
+    animate_slides: bool = Field(True, description="Whether to animate frames using VEO.")
     music_prompt: Optional[str] = Field("Cinematic and educational background music", description="Prompt for background music.")
     video_url: Optional[str] = Field(None, description="GCS URI of the final rendered video.")
 

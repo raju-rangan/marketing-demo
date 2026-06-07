@@ -51,14 +51,16 @@ def add_slidecast_tools(mcp: FastMCP):
     @mcp.tool()
     async def generate_slidecast_storyboard(
         company_name: str,
+        slide_style: str,
+        animate_slides: bool,
+        voiceover_style: str,
         urls: List[str] = None,
         reference_guidelines: str = "",
         customer_persona: str = "",
         duration_seconds: int = 300,
         language: str = "English",
         aspect_ratio: str = "16:9",
-        trend_context: str = "",
-        slide_style: str = "Documentary Realism"
+        trend_context: str = ""
     ) -> str:
         """
         Generates a comprehensive multi-slide presentation blueprint (Slidecast) grounded in source URLs.
@@ -79,7 +81,9 @@ def add_slidecast_tools(mcp: FastMCP):
                 duration_seconds=duration_seconds,
                 language=language,
                 aspect_ratio=aspect_ratio,
-                slide_style=slide_style
+                slide_style=slide_style,
+                animate_slides=animate_slides,
+                voiceover_style=voiceover_style
             )
             
             return manifest.model_dump_json(indent=2)
