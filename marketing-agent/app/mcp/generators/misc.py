@@ -1,12 +1,10 @@
 import json
 import logging
-import asyncio
 import os
 import re
 from typing import List
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import LLM_GEMINI_MODEL_MARKETING_ANALYST, CAMPAIGNS_CONFIG_URL
+from ...state import LLM_GEMINI_MODEL_MARKETING_ANALYST
 from .core import _retry_generate_content
 from ..schemas import BrandContext
 from google.genai import types

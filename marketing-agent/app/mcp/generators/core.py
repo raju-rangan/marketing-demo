@@ -1,16 +1,11 @@
 import asyncio
 import random
-import os
-import logging
 
 from google import genai
-from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
+from ...adk_common.utils.utils_logging import log_message, Severity
 from ...adk_common.utils import utils_agents, utils_gcs
 from ...state import GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_BUCKET_ARTIFACTS
-
-logger = logging.getLogger(__name__)
 
 # ============================================================
 # Core Generation Utilities
@@ -34,20 +29,36 @@ async def _download_uri(uri: str) -> bytes | None:
         res_bytes, _ = utils_agents.download_bytes_from_reference(uri)
         return res_bytes
     except Exception as e:
-        logger.error(f"Failed to download {uri}: {e}")
+        log_message(f"Failed to download {uri}: {e}", Severity.ERROR)
         return None
 
 async def _upload_bytes(data: bytes, folder: str, filename: str, mime_type: str) -> str:
-    """Uploads raw bytes to GCS and returns the public signed URL."""
+    """Uploads raw bytes to GCS and returns the public signed URL.
+    Prepends the current session output folder to the path if set.
+    """
+    from app.utils.context import get_current_output_folder
+    
+    current_folder = get_current_output_folder()
+    if current_folder:
+        folder = f"{current_folder}/{folder}"
+        
     blob_path = f"{folder}/{filename}"
-    gs_uri = utils_gcs.upload_to_gcs(
-        bucket_path=GOOGLE_CLOUD_BUCKET_ARTIFACTS, 
-        file_bytes=data, 
-        destination_blob_name=blob_path,
-        metadata={"source": "mcp-generator"}
-    )
-    # Ensure every returned link is accessible via a signed URL
-    return utils_gcs.get_public_url(gs_uri)
+    log_message(f"Uploading {len(data)} bytes to GCS path: {blob_path}", Severity.INFO)
+    try:
+        gs_uri = utils_gcs.upload_to_gcs(
+            bucket_path=GOOGLE_CLOUD_BUCKET_ARTIFACTS, 
+            file_bytes=data, 
+            destination_blob_name=blob_path,
+            metadata={"source": "mcp-generator"}
+        )
+        log_message(f"Successfully uploaded to {gs_uri}", Severity.INFO)
+        # Ensure every returned link is accessible via a signed URL
+        public_url = utils_gcs.get_public_url(gs_uri)
+        log_message(f"Public URL generated: {public_url}", Severity.INFO)
+        return public_url
+    except Exception as e:
+        log_message(f"Failed to upload to GCS: {e}", Severity.ERROR)
+        raise
 
 def _get_brand_wall_directive(company_name: str, guidelines: str = "") -> str:
     """Returns strict exclusionary rules and visual requirements for media models."""

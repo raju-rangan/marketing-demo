@@ -660,44 +660,19 @@ def get_public_url(blob_path: str) -> str:
         return f"gs://{bucket_name}/{raw_path}"
 
 def set_output_folder(tool_context):
-    """Sets global OUTPUT_FOLDER to {session_id}/{product_name}_{persona}/ for isolation."""
-    from ...state import PRODUCT_COMPANY_NAME_STATE_KEY
+    """Sets global OUTPUT_FOLDER to {session_id}/ for isolation."""
+    from app.utils.context import set_current_output_folder
     
-    # 1. Isolate by Session ID (guarantees a unique ID per conversation)
+    # Isolate by Session ID (guarantees a unique ID per conversation)
     session_id = utils_agents.get_or_create_unique_session_id(
         tool_context.state, 
         fallback_session_id=tool_context.session.id
     )
     
-    # 2. Extract Product/Company Name for sub-folder
-    product_name = tool_context.state.get("PRODUCT_NAME") or tool_context.state.get(PRODUCT_COMPANY_NAME_STATE_KEY) or "default_product"
-    persona_desc = tool_context.state.get("CUSTOMER_PERSONA", "")
-    
-    safe_name = product_name.replace(" ", "_").replace("/", "_")[:40]
-    if persona_desc:
-        persona_map = {
-            "family": "Family_with_Kids",
-            "travel": "Travel_Enthusiast",
-            "professional": "Young_Professional",
-            "fitness": "Fitness_Wellness",
-            "luxury": "Luxury_Premium",
-        }
-        matched = None
-        for keyword, folder_name in persona_map.items():
-            if keyword in persona_desc.lower():
-                matched = folder_name
-                break
-        if matched:
-            sub_folder = f"{safe_name}_{matched}"
-        else:
-            safe_persona = persona_desc.split(".")[0].replace(" ", "_").replace(",", "")[:30]
-            sub_folder = f"{safe_name}_{safe_persona}"
-    else:
-        sub_folder = safe_name
-    
-    # Final isolated path: session_id/folder_structure
-    new_folder = f"{session_id}/{sub_folder}"
+    # Final isolated path: session_id/
+    new_folder = f"{session_id}"
     tool_context.state["CURRENT_OUTPUT_FOLDER"] = new_folder
+    set_current_output_folder(new_folder)
     log_message(f"Output folder isolated by session: {new_folder}", Severity.INFO)
     return new_folder
 

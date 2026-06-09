@@ -37,13 +37,7 @@ class Severity(enum.Enum):
 
 
 def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
-    """Logs a message with a severity and optional prefix.
-
-    Args:
-        message: The message to log.
-        severity: The severity of the log (DEBUG, INFO, ERROR).
-        prefix: Optional prefix. If None, attempts to auto-detect from call stack.
-    """
+    """Logs a message with a severity and optional prefix to stdout/stderr and agent.log."""
     if prefix is None:
         try:
             # Auto-detect prefix from caller
@@ -73,6 +67,14 @@ def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
 
     formatted_message += f" [{AGENT_VERSION}]"
     formatted_message += f" {message}"
+
+    # Centralized log to file
+    try:
+        log_file = os.path.join(os.getcwd(), "agent.log")
+        with open(log_file, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {formatted_message}\n")
+    except Exception:
+        pass
 
     if severity == Severity.ERROR or os.environ.get("VERBOSE_MODE") == "True":
         print(formatted_message, file=sys.stderr, flush=True)

@@ -18,28 +18,15 @@ import tempfile
 import time
 from typing import Optional
 import shutil
-import logging
 import sys
-from enum import Enum
 
 import imageio_ffmpeg
-
 import re
 from PIL import Image
 import io
 
-class Severity(Enum):
-    INFO = logging.INFO
-    WARNING = logging.WARNING
-    ERROR = logging.ERROR
+from app.adk_common.utils.utils_logging import log_message, Severity
 
-def log_message(msg: str, severity: Severity = Severity.INFO):
-    """Logs a message, redirecting to stderr if in MCP mode."""
-    formatted = f"[{severity.name}] [utils_media] {msg}"
-    if os.environ.get("VERBOSE_MODE") == "True" or severity == Severity.ERROR:
-        print(formatted, file=sys.stderr, flush=True)
-    else:
-        print(formatted, flush=True)
 
 # FFmpeg / FFprobe path discovery using imageio-ffmpeg
 try:
@@ -208,10 +195,12 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
     if not voiceover_bytes and not music_bytes:
         return video_bytes
 
+    log_message("Entering mix_audio_onto_video", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input_video.mp4")
         with open(video_path, "wb") as f:
             f.write(video_bytes)
+        log_message(f"Input video written to {video_path}", Severity.INFO)
 
         has_orig_audio = has_audio(video_path)
         log_message(f"Mixing audio. Original audio exists: {has_orig_audio}", Severity.INFO)
@@ -269,18 +258,33 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
 
         try:
             log_message(f"Running ffmpeg mix: {' '.join(cmd)}", Severity.INFO)
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Added timeout to detect if this is indeed where the process stalls
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+            log_message("Audio mixing completed successfully", Severity.INFO)
+            
+            if not os.path.exists(output_path):
+                log_message(f"Error: Output file {output_path} not found after mixing", Severity.ERROR)
+                return video_bytes
+                
+            file_size = os.path.getsize(output_path)
+            log_message(f"Reading output file {output_path} ({file_size} bytes)", Severity.INFO)
+            
             with open(output_path, "rb") as f:
-                return f.read()
+                data = f.read()
+                log_message(f"Read {len(data)} bytes successfully", Severity.INFO)
+                return data
+        except subprocess.TimeoutExpired:
+            log_message("Audio mixing timed out (120s)", Severity.ERROR)
+            return video_bytes
         except subprocess.CalledProcessError as e:
             err_msg = e.stderr.decode() if e.stderr else str(e)
             log_message(f"Audio mixing failed: {err_msg}", Severity.ERROR)
             return video_bytes
         except Exception as e:
-            log_message(f"Audio mixing failed: {e}", Severity.ERROR)
+            log_message(f"Audio mixing error: {e}", Severity.ERROR)
             return video_bytes
 
-def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.0) -> bytes:
+def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.7) -> bytes:
     """Overlays a logo in the bottom-right corner of the video."""
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")
@@ -343,14 +347,17 @@ def overlay_logo_on_image(image_bytes: bytes, logo_bytes: bytes, position: str =
 def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video_duration: float,
                       product_name: str = "", price: str = "", acts: Optional[list[dict]] = None, clip_sec: int = 8) -> bytes:
     """Adds cinematic text overlays at specific timestamps, including voiceover captions."""
+    log_message("Entering add_text_overlays", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         v_in = os.path.join(tmpdir, "in.mp4")
         v_out = os.path.join(tmpdir, "out.mp4")
         with open(v_in, "wb") as f: f.write(video_bytes)
+        log_message(f"Input video written to {v_in}", Severity.INFO)
 
         # Drawtext filters for Company (top left), Tagline (bottom center), and Price (top right)
         filters = []
         font_path = get_font_path()
+        log_message(f"Using font path: {font_path}", Severity.INFO)
         font_str = f":fontfile='{font_path}'" if font_path else ""
         
         # Company Name (appears at 1s, fades in)
@@ -384,9 +391,18 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
         try:
             if not filters: return video_bytes
             log_message(f"Running text overlay: {' '.join(cmd)}", Severity.INFO)
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Use subprocess.run with timeout to prevent infinite stalls
+            result = subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            log_message("FFmpeg text overlay completed successfully", Severity.INFO)
+            if not os.path.exists(v_out):
+                log_message(f"Error: Output file {v_out} not found after text overlay", Severity.ERROR)
+                return video_bytes
+                
             with open(v_out, "rb") as f:
                 return f.read()
+        except subprocess.TimeoutExpired:
+            log_message("FFmpeg text overlay timed out", Severity.ERROR)
+            return video_bytes
         except subprocess.CalledProcessError as e:
             err_msg = e.stderr.decode() if e.stderr else str(e)
             log_message(f"FFmpeg text overlay failed: {err_msg}", Severity.ERROR)
@@ -397,12 +413,16 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
 
 def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, product_price: str = "") -> bytes:
     """Adds a 3-second frozen end-card with a blurred background and call to action."""
+    log_message("Entering add_end_card_overlay", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         v_in = os.path.join(tmpdir, "in.mp4")
         with open(v_in, "wb") as f: f.write(video_bytes)
+        log_message("Input video written to temp for end card", Severity.INFO)
         
         dur = get_video_duration(v_in)
-        if dur <= 0: return video_bytes
+        if dur <= 0: 
+            log_message("Invalid duration for end card, skipping", Severity.WARNING)
+            return video_bytes
 
         v_out = os.path.join(tmpdir, "final_with_endcard.mp4")
         
@@ -423,26 +443,33 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
         ]
         
         try:
-            subprocess.run(cmd, check=True, capture_output=True)
+            log_message(f"Running end card FFmpeg: {' '.join(cmd)}", Severity.INFO)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            log_message("End card FFmpeg command completed", Severity.INFO)
+            
             # Try to put original audio back and pad with silence
             final_path = os.path.join(tmpdir, "final.mp4")
-            subprocess.run([
+            audio_cmd = [
                 FFMPEG_EXE, "-y", "-i", v_out, "-i", v_in, 
                 "-map", "0:v", "-map", "1:a?", 
                 "-c:v", "copy", "-c:a", "aac", 
                 "-af", "apad", "-shortest", 
                 final_path
-            ], capture_output=True)
+            ]
+            log_message(f"Running audio pad FFmpeg: {' '.join(audio_cmd)}", Severity.INFO)
+            subprocess.run(audio_cmd, check=True, capture_output=True, timeout=60)
+            log_message("Audio pad command completed", Severity.INFO)
             
             p = final_path if os.path.exists(final_path) else v_out
             with open(p, "rb") as f:
                 return f.read()
-        except Exception:
+        except Exception as e:
+            log_message(f"End card overlay failed: {e}", Severity.ERROR)
             return video_bytes
 
 def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9") -> bytes | None:
     """
-    Compiles a slidecast video using ffmpeg, using the end image as the hold frame.
+    Compiles a slidecast video using ffmpeg.
     """
     if not slides:
         return None
@@ -461,18 +488,12 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
         input_count = 0
 
         for i, slide in enumerate(slides):
-            # ... (same setup code for aud/img/vid paths)
             img_path = os.path.join(tmpdir, f"img_{i}.png")
-            end_img_path = os.path.join(tmpdir, f"end_img_{i}.png")
             vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
 
             with open(aud_path, "wb") as f: f.write(slide["audio_bytes"])
             with open(img_path, "wb") as f: f.write(slide["image_bytes"])
-            
-            # Use end image if available for padding, otherwise fall back to start image
-            end_bytes = slide.get("end_image_bytes", slide["image_bytes"])
-            with open(end_img_path, "wb") as f: f.write(end_bytes)
 
             aud_dur = get_video_duration(aud_path)
             if aud_dur <= 0:
@@ -492,34 +513,34 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
                 inputs.extend(["-i", vid_path])
                 if aud_dur > vid_dur:
-                    inputs.extend(["-loop", "1", "-t", str(max(0, aud_dur - vid_dur)), "-i", end_img_path])
+                    end_img_path = os.path.join(tmpdir, f"end_img_{i}.png")
+                    end_bytes = slide.get("end_image_bytes") or slide["image_bytes"]
+                    with open(end_img_path, "wb") as f: f.write(end_bytes)
+                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", end_img_path])
                     img_idx = input_count
                     input_count += 1
-                    # Ensure video is scaled to canvas, then concat with end image hold
                     v_filter = (
                         f"[{v_idx}:v]{canvas_str}[v_vid_{i}];"
                         f"[{img_idx}:v]{canvas_str}[v_img_{i}];"
-                        f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0[v{i}];"
+                        f"[v_vid_{i}][v_img_{i}]concat=n=2:v=1:a=0,trim=duration={aud_dur},setpts=PTS-STARTPTS,"
                     )
                 else:
-                    # Video is long enough, just scale it
-                    v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS[v{i}];"
+                    v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
             else:
-                # Image-only slide, loop for duration
                 inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
-                v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS[v{i}];"
+                v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
 
             if text:
-                # Add text overlay to the visual output stream
-                v_filter = v_filter.replace(f"[v{i}];", f",drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200{font_str}[v{i}];")
+                v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
 
+            v_filter = v_filter.rstrip(",")
+            v_filter += f"[v{i}];"
             filter_complex.append(v_filter)
 
             inputs.extend(["-i", aud_path])
             a_idx = input_count
             input_count += 1
             filter_complex.append(f"[{a_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];")
-        # ... (rest of compilation)
 
         # Concat all slides (requires alternating v/a streams [v0][a0][v1][a1])
         concat_streams = "".join([f"[v{i}][a{i}]" for i in range(len(slides))])
