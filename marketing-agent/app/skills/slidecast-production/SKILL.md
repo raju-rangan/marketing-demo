@@ -17,15 +17,17 @@ When the user asks to create an educational video, a "Slidecast," or short-form 
 2. **Style & Motion Selection (MANDATORY & EXPLICIT)**:
    - Before generating the storyboard, you MUST present the user with a clear, formatted set of choices for the video's aesthetic, narration, and motion. 
    - **CRITICAL**: You MUST NOT skip this step. You MUST NOT assume the user's choices. You MUST NOT abbreviate or summarize the list. You MUST present the full list of options exactly as they appear below and wait for the user's explicit response.
-   - **Step 1: Choose Visual Style** (List these exactly):
-    - `Flat Vector Explainer` (Minimalist/2D)
-    - `Modern 3D Isometric` (Playful/3D)
-    - `Minimalist Flat Characters` (Minimalist Corporate Memphis)
-    - `Documentary Realism` (Professional Photography)
-    - `Stop-Motion Claymation` (Tactile/Handmade)
-    - `Minimalist Low-Poly 3D` (Clean 3D/Low-Poly)
-    - `Glassmorphism & Abstract Data` (Digital/High-Tech)
-    - `Pencil Sketch` (Monochrome Line Art)
+   - **Step 1: Choose Visual Style Option** (Ask the user to choose between Option 1 or Option 2):
+     - **Option 1: Brand-Approved Identity** (Uses preconfigured characters and style references to guarantee brand consistency).
+     - **Option 2: Custom Aesthetic** (Choose a new style from the menu below):
+       - `Flat Vector Explainer` (Minimalist/2D)
+       - `Modern 3D Isometric` (Playful/3D)
+       - `Minimalist Flat Characters` (Minimalist Corporate Memphis)
+       - `Documentary Realism` (Professional Photography)
+       - `Stop-Motion Claymation` (Tactile/Handmade)
+       - `Minimalist Low-Poly 3D` (Clean 3D/Low-Poly)
+       - `Glassmorphism & Abstract Data` (Digital/High-Tech)
+       - `Pencil Sketch` (Monochrome Line Art)
    - **Step 2: Choose Voiceover Option** (List these exactly):
      - `Energetic & Engaging`
      - `Professional & Trustworthy`

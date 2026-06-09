@@ -117,7 +117,8 @@ async def generate_slidecast_manifest(
     trend_context: str = "",
     duration_seconds: int = 300,
     language: str = "English",
-    aspect_ratio: str = "16:9"
+    aspect_ratio: str = "16:9",
+    use_preapproved_style: bool = False
 ) -> SlidecastManifest:
     """
     Stateless generator for a slidecast presentation blueprint.
@@ -125,16 +126,21 @@ async def generate_slidecast_manifest(
     """
     duration_minutes = duration_seconds / 60.0
     total_word_target = max(60, int(duration_minutes * 160))
-    
+
     if duration_seconds <= 60:
         # Shorts mode: high frequency of visual changes
         num_slides = max(3, int(duration_seconds / 7.5))
     else:
         # Long-form mode: educational pacing
         num_slides = max(12, min(25, int(duration_minutes * 5)))
-        
+
     words_per_slide = max(10, total_word_target // num_slides)
-    style_desc = SLIDE_STYLES.get(slide_style, slide_style)
+
+    if use_preapproved_style:
+        style_desc = "CRITICAL: Do NOT write generic style descriptions (e.g., 'Cinematic lighting, realistic'). The style will be strictly enforced downstream by a brand-provided reference image. Focus the image_prompt SOLELY on the subject matter, the character's actions, and the composition of the scene."
+    else:
+        style_desc = SLIDE_STYLES.get(slide_style, slide_style)
+
     url_list_str = "\n".join([f"- {url}" for url in urls]) if urls else "No specific URLs provided."
 
     prompt = (

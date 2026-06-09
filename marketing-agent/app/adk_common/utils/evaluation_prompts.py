@@ -93,18 +93,20 @@ def get_image_evaluation_prompt(input_prompt: str, reference_image_descriptions:
     4.  **Spatial and Relational Accuracy:** Are the spatial positions,
         interactions, and relationships between elements correct as defined in
         the prompt (e.g., "on top of," "next to")?
-    5.  **Style and Medium Fidelity:** Does the image's artistic style,
-        and mood (e.g., "photorealistic," "pencil sketch") match the prompt's
-        request? Unless explicitly stated otherwise (e.g., "cartoon", "sketch"),
-        the default expectation is **Hyper-Realistic/Photorealistic**. If the image looks
-        "AI-generated", smooth, or cartoony when photorealism was expected, this is a Fail.
+    5.  **Style, Medium, and Color Fidelity (CRITICAL):** Does the image's artistic style,
+        mood, and color palette EXACTLY match the prompt's request and the reference images?
+        Unless explicitly stated otherwise (e.g., "cartoon", "sketch"), the default expectation 
+        is Hyper-Realistic/Photorealistic. However, if an animation or specific art style is 
+        requested or provided via a reference image, the generated image MUST look exactly 
+        like a frame from that same animation/style. If the color scheme or style drifts, it is a FAIL.
     6.  **Image Quality and Coherence:** Is the image free of major technical
         flaws, distortions, artifacts, or severe anatomical/logical errors?
     {criteria_6}
     8.  **Consistency (CRITICAL):** Does the image maintain STRICT consistency with the reference images?
         *   **Character Identity:** The character's face, age, ethnicity, and key features MUST be identical to the reference.
-        *   **Product Details:** The product (e.g., jacket, logo) must match the reference exactly (color, texture, logos).
-        *   If the character looks like a different person or the product is wrong, this is an automatic **FAIL**.
+        *   **Animation/Art Style:** The visual aesthetic MUST perfectly match the reference image's style.
+        *   **Color Palette:** The colors used in the generated image MUST strictly adhere to the reference image's color palette.
+        *   If the character looks like a different person, the style is wrong, or the colors drift from the reference, this is an automatic **FAIL**.
 
     ## 3. OUTPUT FORMAT
 

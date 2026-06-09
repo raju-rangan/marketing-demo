@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def add_slidecast_tools(mcp: FastMCP):
     
     @mcp.tool()
-    async def select_slidecast_style(slide_style: str, voiceover_style: str, animate: bool = False) -> str:
+    async def select_slidecast_style(slide_style: str, voiceover_style: str, animate: bool = True, use_preapproved_style: bool = True) -> str:
         """
         Records the user's preferred visual and vocal style for a Slidecast.
         
@@ -32,27 +32,30 @@ def add_slidecast_tools(mcp: FastMCP):
         Use this immediately after presenting the user with styling options, before generating the story arc.
         
         ARGS:
-        - slide_style (str): The visual aesthetic (e.g. 'Flat Vector Explainer', 'Documentary Realism'). Must exactly match an available option.
+        - slide_style (str): The visual aesthetic (e.g. 'Flat Vector Explainer', 'Documentary Realism'). Must exactly match an available option unless use_preapproved_style is True.
         - voiceover_style (str): The persona of the narrator (e.g. 'Energetic & Engaging').
         - animate (bool): Whether the final video should use Veo animations (True) or static images (False).
+        - use_preapproved_style (bool): Set to True if the user selected Option 1 (Brand-Approved Identity). If True, slide_style can be an arbitrary string like 'Brand Identity'.
         
         RETURNS:
         A JSON string confirming the selection. The agent must remember these choices to pass to subsequent tools.
         """
-        if slide_style not in SLIDE_STYLES:
-            return json.dumps({"status": "error", "message": f"Invalid slide style. Choose from: {list(SLIDE_STYLES.keys())}"})
+        if not use_preapproved_style and slide_style not in SLIDE_STYLES:
+            return json.dumps({"status": "error", "message": f"Invalid slide style. Choose from: {list(SLIDE_STYLES.keys())} or set use_preapproved_style to True."})
         if voiceover_style not in VOICEOVER_STYLES:
             return json.dumps({"status": "error", "message": f"Invalid voiceover style. Choose from: {list(VOICEOVER_STYLES.keys())}"})
 
         # In MCP stateless mode, we return the success message. 
         # The agent is responsible for remembering these choices or passing them to subsequent tools.
         animate_msg = "with AI video animations" if animate else "using static slides"
+        style_msg = "Brand Preapproved Style" if use_preapproved_style else slide_style
         return json.dumps({
             "status": "success", 
-            "message": f"Style locked: {slide_style} / {voiceover_style} ({animate_msg})",
+            "message": f"Style locked: {style_msg} / {voiceover_style} ({animate_msg})",
             "slide_style": slide_style,
             "voiceover_style": voiceover_style,
-            "animate": animate
+            "animate": animate,
+            "use_preapproved_style": use_preapproved_style
         })
 
     @mcp.tool()
@@ -82,6 +85,7 @@ def add_slidecast_tools(mcp: FastMCP):
         slide_style: str,
         animate_slides: bool,
         voiceover_style: str,
+        use_preapproved_style: bool = False,
         urls: List[str] = None,
         reference_guidelines: str = "",
         customer_persona: str = "",
@@ -98,6 +102,7 @@ def add_slidecast_tools(mcp: FastMCP):
         
         ARGS:
         - company_name, slide_style, animate_slides, voiceover_style: Required context.
+        - use_preapproved_style: Whether to use the preapproved brand identity style.
         - urls: Source material links provided by the user.
         - duration_seconds: Expected video length (e.g., 60 for Shorts, 300 for Slidecasts).
         - trend_context: Strategic angle derived from the trend-analysis skill.
@@ -121,8 +126,10 @@ def add_slidecast_tools(mcp: FastMCP):
                 aspect_ratio=aspect_ratio,
                 slide_style=slide_style,
                 animate_slides=animate_slides,
-                voiceover_style=voiceover_style
+                voiceover_style=voiceover_style,
+                use_preapproved_style=use_preapproved_style
             )
+            manifest.use_preapproved_style = use_preapproved_style
             return manifest.model_dump_json(indent=2)
         except Exception as e:
             return json.dumps({"status": "error", "details": str(e)})
@@ -195,7 +202,17 @@ def add_slidecast_tools(mcp: FastMCP):
             slides_to_process = [manifest.slides[slide_index]] if slide_index is not None else manifest.slides
             
             import asyncio
+            import os
+            from .generators.core import _download_uri
             
+            preapproved_img_bytes = None
+            if getattr(manifest, "use_preapproved_style", False):
+                active_brand = os.environ.get("ACTIVE_BRAND", "goog")
+                bucket_name = os.environ.get("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
+                if bucket_name:
+                    style_ref_uri = f"gs://{bucket_name}/brands/{active_brand}/assets/reference_image.png"
+                    preapproved_img_bytes = await _download_uri(style_ref_uri)
+
             async def _process_slide_images(slide):
                 # We need to hold the bytes locally to pass them as references, 
                 # even if the URL is already set, so we attempt to download if it exists.
@@ -204,20 +221,33 @@ def add_slidecast_tools(mcp: FastMCP):
                 # 1. IMAGE (START)
                 if slide_index is not None or not slide.start_image_url:
                     styled_prompt = f"{slide.image_prompt}\n\nBRAND RULES:\n{brand.reference_guidelines[:500]}"
-                    start_img_bytes = await _generate_gemini_image(styled_prompt, [], label=f"slide_{slide.index}_start", aspect_ratio=manifest.aspect_ratio)
+                    ref_images = []
+                    if preapproved_img_bytes:
+                        ref_images = [preapproved_img_bytes]
+                        styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                    start_img_bytes = await _generate_gemini_image(styled_prompt, ref_images, label=f"slide_{slide.index}_start", aspect_ratio=manifest.aspect_ratio)
                     if start_img_bytes:
                         slide.start_image_url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
                 else:
                     # Download existing so we can use it as a reference
-                    # Note: We need a utility to download, assuming _download_uri exists (we need to import it)
-                    from .generators.core import _download_uri
                     start_img_bytes = await _download_uri(slide.start_image_url)
 
                 # 2. IMAGE (END)
                 if slide.end_image_prompt and (slide_index is not None or not slide.end_image_url):
                     # Pass the start image as a strict visual reference to maintain consistency
-                    ref_images = [start_img_bytes] if start_img_bytes else []
+                    ref_images = []
                     styled_prompt = f"{slide.end_image_prompt}\n\nBRAND RULES:\n{brand.reference_guidelines[:500]}"
+                    if preapproved_img_bytes:
+                        ref_images = [preapproved_img_bytes]
+                        if start_img_bytes:
+                            ref_images.append(start_img_bytes)
+                            styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                            styled_prompt += "\nUse Image 2 as the temporal structural guide for consistency, ensuring the character's pose and outline transition naturally from the state established in Image 2."
+                        else:
+                            styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                    else:
+                        if start_img_bytes:
+                            ref_images = [start_img_bytes]
                     end_img_bytes = await _generate_gemini_image(styled_prompt, ref_images, label=f"slide_{slide.index}_end", aspect_ratio=manifest.aspect_ratio)
                     if end_img_bytes:
                         slide.end_image_url = await _upload_bytes(end_img_bytes, "mcp_slidecast", f"slide_{slide.index}_end.png", "image/png")
@@ -302,24 +332,28 @@ def add_slidecast_tools(mcp: FastMCP):
             
             import asyncio
             
+            # Concurrency limit of 5 to avoid overwhelming Veo
+            semaphore = asyncio.Semaphore(5)
+            
             async def _process_slide_video(slide):
                 if slide.video_url and slide_index is None:
                     return # Skip if exists, unless forced by slide_index
                 
-                # Veo clip generation
-                vid_bytes = await _generate_single_veo_clip(
-                    prompt=slide.image_prompt,
-                    start_frame_gcs_uri=slide.start_image_url,
-                    end_frame_gcs_uri=slide.end_image_url,
-                    clip_duration=8,
-                    label=f"slide_{slide.index}",
-                    aspect_ratio=manifest.aspect_ratio
-                )
-                if vid_bytes:
-                    slide.video_url = await _upload_bytes(vid_bytes, "mcp_slidecast", f"segment_{slide.index}.mp4", "video/mp4")
-                    log_message(f"Generated animation segment for slide {slide.index+1}", Severity.INFO)
+                async with semaphore:
+                    # Veo clip generation
+                    vid_bytes = await _generate_single_veo_clip(
+                        prompt=slide.image_prompt,
+                        start_frame_gcs_uri=slide.start_image_url,
+                        end_frame_gcs_uri=slide.end_image_url,
+                        clip_duration=8,
+                        label=f"slide_{slide.index}",
+                        aspect_ratio=manifest.aspect_ratio
+                    )
+                    if vid_bytes:
+                        slide.video_url = await _upload_bytes(vid_bytes, "mcp_slidecast", f"segment_{slide.index}.mp4", "video/mp4")
+                        log_message(f"Generated animation segment for slide {slide.index+1}", Severity.INFO)
             
-            # Process all slides concurrently
+            # Process all slides with semaphore limit
             await asyncio.gather(*[_process_slide_video(slide) for slide in slides_to_process])
             
             return manifest.model_dump_json(indent=2)

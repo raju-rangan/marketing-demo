@@ -47,6 +47,7 @@ class BrandContext(BaseModel):
     reference_guidelines: str = Field("", description="Brand voice, visual rules, and directives.")
     logo_uri: Optional[str] = Field(None, description="GCS URI of the brand logo.")
     customer_persona: str = Field("", description="Target audience description.")
+    style_reference_image_uri: Optional[str] = Field(None, description="GCS URI to the preapproved style and character reference image.")
 
 class SlidecastSlide(BaseModel):
     index: int = Field(..., description="The sequence index of the slide.")
@@ -71,6 +72,7 @@ class SlidecastManifest(BaseModel):
     
     # Global Style Configuration
     slide_style: str = Field("Documentary Realism", description="Visual style name.")
+    use_preapproved_style: bool = Field(True, description="Whether to use the preapproved brand identity instead of a specific slide_style.")
     voiceover_style: str = Field("Puck", description="Voiceover persona name.")
     animate_slides: bool = Field(True, description="Whether to animate frames using VEO.")
     music_prompt: Optional[str] = Field("Cinematic and educational background music", description="Prompt for background music.")

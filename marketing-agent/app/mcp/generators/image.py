@@ -17,7 +17,10 @@ def _get_image_mime_type(data: bytes) -> str:
 
 async def _generate_gemini_image(prompt: str, reference_images: list[bytes], label: str = "image", aspect_ratio: str = None) -> bytes | None:
     safe_prompt = prompt + (
-        "\n\nCRITICAL NEGATIVE DIRECTIVE: Do NOT render any of my stylistic, formatting, or layout instructions (e.g., 'mobile first typography', 'extreme readability', 'centered', 'bold claim') as literal text in the image. Any text in the image MUST ONLY be the actual educational content, titles, or data labels. Never write metadata or instructions on the canvas."
+        "\n\nCRITICAL NEGATIVE DIRECTIVE: "
+        "Do NOT render any storyboard descriptions, act summaries, scene labels, or descriptive text (e.g., 'THE ENTREPRENEUR IS WALKING...') as literal text in the image. "
+        "Do NOT render color palettes, swatches, hex codes, or reference UI elements on the canvas. "
+        "The image should ONLY contain the visual scene. If text is not explicitly requested as an object within the scene (like a sign), do not render any text at all."
     )
     
     log_message(f"🖼️ [`IMAGE GEN ARGS]` Label: {label} | Aspect Ratio: {aspect_ratio}", Severity.INFO)

@@ -108,6 +108,13 @@ async def load_brand_context(preset_name: str = None) -> BrandContext:
     logo_uri = utils_gcs.get_public_url(raw_logo_uri) if raw_logo_uri else None
     
     visual_identity = resolve_placeholders(preset.get("visual_identity", ""))
+    
+    # Append dynamically extracted style prompt if it exists
+    style_prompt_path = os.path.join(brand_dir, "assets", "style_prompt.txt")
+    if os.path.exists(style_prompt_path):
+        with open(style_prompt_path, "r") as f:
+            visual_identity += f"\n\n### AUTOMATICALLY EXTRACTED STYLE DIRECTIVE\n{f.read()}"
+
     exclusion_rules = resolve_placeholders(preset.get("exclusion_rules", ""))
     
     final_guidelines = (
@@ -116,11 +123,17 @@ async def load_brand_context(preset_name: str = None) -> BrandContext:
         f"### BRAND WALL & EXCLUSIONS\n{exclusion_rules}"
     )
 
+    bucket_name = os.environ.get("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
+    style_ref_uri = None
+    if bucket_name:
+        style_ref_uri = f"gs://{bucket_name}/brands/{active_brand}/assets/reference_image.png"
+
     return BrandContext(
         company_name=preset.get("company_name", active_brand.upper()),
         reference_guidelines=final_guidelines,
         logo_uri=logo_uri,
-        customer_persona=preset.get("customer_persona", "")
+        customer_persona=preset.get("customer_persona", ""),
+        style_reference_image_uri=style_ref_uri
     )
 
 async def register_assets_stateless(existing_uris: List[str], new_uris: List[str]) -> dict:
