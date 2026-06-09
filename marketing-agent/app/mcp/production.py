@@ -13,28 +13,32 @@ from ..utils.media import (
     overlay_logo_on_video,
     add_text_overlays,
     add_end_card_overlay,
-    compile_slidecast_video,
-    log_message,
-    Severity
+    compile_slidecast_video
 )
+from app.adk_common.utils.utils_logging import log_message, Severity
 
 logger = logging.getLogger(__name__)
 
 def add_production_tools(mcp: FastMCP):
     
     @mcp.tool()
-    async def generate_video_from_storyboard(render_job_json: str) -> str:
+    async def stitch_raw_assets(job: RenderJob) -> str:
         """
-        Executes a final render job, assembling video clips, voiceover, and music.
-        Takes a JSON string matching the RenderJob schema.
-        Returns a JSON object with the final stitched MP4 GCS URI.
+        Utility primitive: Stitches arbitrary media assets (clips, voiceover, music) from a list of URIs into a final video.
+        
+        WHEN TO USE:
+        Use this ONLY for generic video ad production (e.g., Shorts or custom RenderJobs). DO NOT use this for Slidecast/presentation rendering.
+        
+        ARGS:
+        - job: A strictly typed RenderJob Pydantic object containing the individual URIs to stitch.
+        
+        RETURNS:
+        A JSON object with the final stitched MP4 GCS URI.
         """
         try:
-            # 1. Parse the strictly typed RenderJob payload
-            job = RenderJob.model_validate_json(render_job_json)
-            
             logger.info(f"Starting production for {job.company_name} - {len(job.video_clip_uris)} clips.")
             
+            # ... (rest of function)
             # 2. Download all assets in parallel
             download_tasks = [
                 *[_download_uri(uri) for uri in job.video_clip_uris],
@@ -82,7 +86,9 @@ def add_production_tools(mcp: FastMCP):
                 acts=acts_dicts, 
                 clip_sec=clip_sec
             )
+            logger.info("Calling add_end_card_overlay...")
             final_video = add_end_card_overlay(final_video, job.company_name, job.tagline)
+            logger.info("Finished add_end_card_overlay.")
             
             # 4. Upload final asset
             ts = int(time.time() * 1000)
@@ -100,16 +106,20 @@ def add_production_tools(mcp: FastMCP):
             return json.dumps({"status": "error", "details": str(e)})
 
     @mcp.tool()
-    async def generate_video_from_slidecast(slidecast_json: str) -> str:
+    async def render_slidecast(manifest: SlidecastManifest) -> str:
         """
-        Executes a final render job for a Slidecast.
-        Takes a JSON string matching the SlidecastManifest schema.
-        Returns a JSON object with the final stitched MP4 GCS URI.
+        Gate 3 Finalization: Compiles a completed SlidecastManifest into a final video.
+        
+        WHEN TO USE:
+        Call this as the absolute final step (Gate 3) of the Slidecast workflow, ONLY AFTER all required audio and image/video segments have been rendered.
+        
+        ARGS:
+        - manifest: The fully populated SlidecastManifest containing all the generated image/video/audio URIs.
+        
+        RETURNS:
+        A JSON object with the final stitched MP4 GCS URI. Present this final link to the user.
         """
         try:
-            # 1. Parse the strictly typed SlidecastManifest payload
-            manifest = SlidecastManifest.model_validate_json(slidecast_json)
-            
             logger.info(f"Starting slidecast production: {manifest.title} - {len(manifest.slides)} slides.")
             
             # 2. Download all assets (images, video, audio per slide)

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def add_storyboard_tools(mcp: FastMCP):
     
     @mcp.tool()
-    async def generate_campaign_storyboard(
+    async def generate_campaign_plan(
         company_name: str,
         product_name: str,
         campaign_rationale: str = "A cinematic journey",
@@ -18,8 +18,18 @@ def add_storyboard_tools(mcp: FastMCP):
         duration_seconds: int = 24
     ) -> str:
         """
-        Creates a bold, emotional video storyline and multi-act storyboard structure for a product.
-        This focuses purely on the narrative and structure, returning a JSON manifest.
+        Creates a bold, emotional video storyline and multi-act storyboard structure for a general product campaign (Shorts or Ads).
+        
+        WHEN TO USE:
+        Use this for general marketing campaigns and video ads. DO NOT use this for Slidecasts/presentations (use generate_story_arc instead).
+        
+        ARGS:
+        - company_name, product_name: Brand context.
+        - campaign_rationale: High-level strategy (e.g., from trend analysis).
+        - duration_seconds: Target video length.
+        
+        RETURNS:
+        A JSON string containing the StoryboardManifest.
         """
         try:
             logger.info(f"Generating storyline for {company_name} - {product_name}")

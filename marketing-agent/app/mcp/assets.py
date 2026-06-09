@@ -30,9 +30,19 @@ def add_asset_tools(mcp: FastMCP):
         guidelines: str = ""
     ) -> str:
         """
-        Generates a sequence of keyframe images based on scene descriptions.
-        Typically used for creating the visual storyboard frames.
-        Returns a JSON list of generated GCS URIs.
+        Utility Primitive: Generates a sequence of keyframe images based on scene descriptions.
+        
+        WHEN TO USE:
+        Use ONLY for ad-hoc or generic storyboard asset creation outside of a structured Slidecast. Do NOT use this tool if you are producing a Slidecast (use render_images instead).
+        
+        ARGS:
+        - company_name, product_name: Brand context.
+        - scene_descriptions: List of text prompts describing each frame.
+        - reference_image_uris: Optional list of base images.
+        - aspect_ratio: Usually "16:9" or "9:16".
+        
+        RETURNS:
+        A JSON string containing a list of the generated image GCS URIs.
         """
         try:
             # Download reference images (like product or logo)
@@ -81,10 +91,24 @@ def add_asset_tools(mcp: FastMCP):
         aspect_ratio: str = "16:9"
     ) -> str:
         """
-        Generates high-fidelity video clips using VEO based on motion prompts and frame pairs.
-        Returns a JSON list of generated MP4 GCS URIs.
+        Utility Primitive: Generates high-fidelity video clips using Veo based on motion prompts and frame pairs.
+        
+        WHEN TO USE:
+        Use ONLY for ad-hoc video segment generation outside of a structured Slidecast. Do NOT use this tool if you are producing a Slidecast (use generate_video_segments instead).
+        
+        ARGS:
+        - motion_prompts: List of text prompts describing the movement.
+        - start_frame_uris: The starting image for each clip.
+        - end_frame_uris: The ending image for each clip.
+        
+        RETURNS:
+        A JSON string containing a list of the generated MP4 GCS URIs.
         """
         try:
+            # Map duration to nearest supported: 4, 6, 8
+            supported = [4, 6, 8]
+            effective_duration = min(supported, key=lambda x: abs(x - clip_duration_seconds))
+            
             async def _gen_video(idx, motion, start_uri, end_uri):
                 # Use provided end_uri or fallback to start_uri for stability
                 target_end_uri = end_uri if end_uri else start_uri
@@ -92,7 +116,7 @@ def add_asset_tools(mcp: FastMCP):
                     prompt=motion,
                     start_frame_gcs_uri=start_uri,
                     end_frame_gcs_uri=target_end_uri,
-                    clip_duration=clip_duration_seconds,
+                    clip_duration=effective_duration,
                     label=f"mcp_clip_{idx}",
                     aspect_ratio=aspect_ratio
                 )
@@ -116,8 +140,17 @@ def add_asset_tools(mcp: FastMCP):
     @mcp.tool()
     async def create_voiceover(script: str, voice_name: str = "Puck") -> str:
         """
-        Generates a realistic voiceover track from a script.
-        Returns a JSON object containing the audio GCS URI.
+        Utility Primitive: Generates a realistic voiceover audio track from a script using Google TTS.
+        
+        WHEN TO USE:
+        Use ONLY for ad-hoc voiceover generation. Do NOT use this tool if you are producing a Slidecast (use render_audio instead).
+        
+        ARGS:
+        - script (str): The text to be spoken.
+        - voice_name (str): The Google TTS voice identifier.
+        
+        RETURNS:
+        A JSON string containing the generated audio WAV GCS URI.
         """
         try:
             audio_bytes = await _generate_voiceover_audio(script, voice_name)
@@ -132,8 +165,16 @@ def add_asset_tools(mcp: FastMCP):
     @mcp.tool()
     async def create_background_music(lyria_prompt: str, product_name: str) -> str:
         """
-        Generates an instrumental background music track using Lyria.
-        Returns a JSON object containing the audio GCS URI.
+        Utility Primitive: Generates an instrumental background music track using Google Lyria.
+        
+        WHEN TO USE:
+        Use this anytime you need a custom, royalty-free background track based on a mood or style description.
+        
+        ARGS:
+        - lyria_prompt (str): Description of the music (e.g., "Upbeat corporate acoustic guitar").
+        
+        RETURNS:
+        A JSON string containing the generated audio WAV GCS URI.
         """
         try:
             audio_bytes = await _generate_lyria_music(lyria_prompt, product_name)

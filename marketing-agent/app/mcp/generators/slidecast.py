@@ -85,9 +85,28 @@ def _generate_approval_pdf(title: str, slides: List[SlidecastSlide], slide_image
 
     return pdf.output()
 
-# ============================================================
-# Public Generators
-# ============================================================
+async def generate_slidecast_audio_assets(manifest: SlidecastManifest) -> SlidecastManifest:
+    """
+    Generates audio clips for a slidecast manifest AFTER visual approval.
+    """
+    log_message(f"Starting audio generation for: {manifest.title}", Severity.INFO)
+    
+    async def _gen_audio(slide: SlidecastSlide):
+        if not slide.audio_url:
+            log_message(f"Slide {slide.index+1}: generating new audio...", Severity.INFO)
+            voice_id = VOICEOVER_STYLES.get(manifest.voiceover_style, "Puck")
+            audio_bytes = await _generate_voiceover_audio(slide.voiceover_script, voice_name=voice_id)
+            if audio_bytes:
+                url = await _upload_bytes(audio_bytes, "mcp_slidecast", f"audio_{slide.index}.wav", "audio/wav")
+                slide.audio_url = url
+        else:
+            log_message(f"Slide {slide.index+1}: audio already exists.", Severity.INFO)
+        return slide
+
+    updated_slides = await asyncio.gather(*[_gen_audio(s) for s in manifest.slides])
+    manifest.slides = list(updated_slides)
+    
+    return manifest
 
 async def generate_slidecast_manifest(
     brand: BrandContext,
@@ -133,8 +152,9 @@ async def generate_slidecast_manifest(
         f"BRAND MANDATE:\n{brand.reference_guidelines[:1000]}\n"
         # Enable this if you want to enforce logo presence in the image generation step, but it is an issue if you want to enforce strict branding.
         # f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
-        f"- If animation is requested, include an 'end_image_prompt'. This MUST represent the scene 5 minutes later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
-        f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script)."
+        f"- ALWAYS include an 'end_image_prompt'. This MUST represent the scene 5 minutes later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
+        f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script).\n"
+        f"CRITICAL: The 'content' field in each slide MUST be a JSON array of strings (e.g., [\"Bullet 1\", \"Bullet 2\"]), NOT a single string."
     )
 
     response = await _retry_generate_content(
@@ -143,29 +163,33 @@ async def generate_slidecast_manifest(
         config=types.GenerateContentConfig(
             temperature=0.7, 
             response_mime_type="application/json",
+            response_schema=SlidecastManifest,
             tools=[types.Tool(google_search=types.GoogleSearch())] if urls else None
         ),
         label="slidecast-manifest"
     )
     
-    data = json.loads(response.text)
-    slides = [SlidecastSlide(**s) for s in data.get("slides", [])]
-        
-    return SlidecastManifest(
-        title=data.get("title", f"Presentation for {brand.company_name}"),
-        company_name=brand.company_name,
-        aspect_ratio=aspect_ratio,
-        language=language,
-        slides=slides,
-        slide_style=slide_style
-    )
+    return SlidecastManifest.model_validate_json(response.text)
 
-async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandContext) -> dict:
-    """
-    Generates images, audio clips, and a summary PDF for the slidecast.
-    Restores 'skip if exists' logic and branded reference loading.
-    """
-    log_message(f"Starting asset preview for: {manifest.title}", Severity.INFO)
+async def generate_approval_pdf_backend(manifest: SlidecastManifest) -> str:
+    """Generates and uploads an approval PDF storyboard based on current manifest state."""
+    log_message(f"Generating approval PDF for: {manifest.title}", Severity.INFO)
+    
+    # Placeholder images if not generated yet
+    slide_images = []
+    for slide in manifest.slides:
+        slide_images.append((
+            await _download_uri(slide.start_image_url) if slide.start_image_url else None,
+            await _download_uri(slide.end_image_url) if slide.end_image_url else None
+        ))
+        
+    pdf_content = _generate_approval_pdf(manifest.title, manifest.slides, slide_images)
+    pdf_url = await _upload_bytes(pdf_content, "mcp_slidecast", f"approval_document_{int(time.time())}.pdf", "application/pdf")
+    return pdf_url
+
+async def produce_assets(manifest: SlidecastManifest, brand: BrandContext) -> SlidecastManifest:
+    """Generates images and audio assets for approved manifest."""
+    log_message(f"Starting asset production for: {manifest.title}", Severity.INFO)
     
     # 1. Load brand assets for reference
     logo_bytes = await _download_uri(brand.logo_uri) if brand.logo_uri else None
@@ -173,12 +197,9 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
     
     # 2. Process slides in parallel
     async def _gen_slide_assets(slide: SlidecastSlide):
-        # IMAGE (START): Skip if already exists
-        if slide.start_image_url:
-            log_message(f"Slide {slide.index+1}: using existing start image.", Severity.INFO)
-            start_img_bytes = await _download_uri(slide.start_image_url)
-        else:
-            log_message(f"Slide {slide.index+1}: generating new start image...", Severity.INFO)
+        # IMAGE (START)
+        if not slide.start_image_url:
+            log_message(f"Slide {slide.index+1}: generating start image...", Severity.INFO)
             styled_prompt = f"{slide.image_prompt}\n\nREFERENCE BRAND RULES:\n{brand.reference_guidelines[:500]}"
             start_img_bytes = await _generate_gemini_image(
                 styled_prompt, 
@@ -187,61 +208,32 @@ async def preview_slidecast_assets(manifest: SlidecastManifest, brand: BrandCont
                 aspect_ratio=manifest.aspect_ratio
             )
             if start_img_bytes:
-                url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
-                slide.start_image_url = url
-                log_message(f"🏳️ Slide {slide.index+1} START IMAGE: {url}", Severity.INFO)
+                slide.start_image_url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
 
-        # IMAGE (END): Only if requested and not exists
-        end_img_bytes = None
-        if slide.end_image_prompt:
-            if slide.end_image_url:
-                log_message(f"Slide {slide.index+1}: using existing end image.", Severity.INFO)
-                end_img_bytes = await _download_uri(slide.end_image_url)
-            else:
-                log_message(f"Slide {slide.index+1}: generating new end image...", Severity.INFO)
-                # Inject start_img_bytes into the reference list for consistency
-                end_ref_images = ref_images + ([start_img_bytes] if start_img_bytes else [])
-                styled_prompt = f"{slide.end_image_prompt}\n\nREFERENCE BRAND RULES:\n{brand.reference_guidelines[:500]}"
-                end_img_bytes = await _generate_gemini_image(
-                    styled_prompt, 
-                    end_ref_images, 
-                    label=f"slide_{slide.index}_end", 
-                    aspect_ratio=manifest.aspect_ratio
-                )
-                if end_img_bytes:
-                    url = await _upload_bytes(end_img_bytes, "mcp_slidecast", f"slide_{slide.index}_end.png", "image/png")
-                    slide.end_image_url = url
-                    log_message(f"🏁 Slide {slide.index+1} END IMAGE: {url}", Severity.INFO)
+        # IMAGE (END)
+        if slide.end_image_prompt and not slide.end_image_url:
+            log_message(f"Slide {slide.index+1}: generating end image...", Severity.INFO)
+            start_img_bytes = await _download_uri(slide.start_image_url) if slide.start_image_url else None
+            end_ref_images = ref_images + ([start_img_bytes] if start_img_bytes else [])
+            styled_prompt = f"{slide.end_image_prompt}\n\nREFERENCE BRAND RULES:\n{brand.reference_guidelines[:500]}"
+            end_img_bytes = await _generate_gemini_image(
+                styled_prompt, 
+                end_ref_images, 
+                label=f"slide_{slide.index}_end", 
+                aspect_ratio=manifest.aspect_ratio
+            )
+            if end_img_bytes:
+                slide.end_image_url = await _upload_bytes(end_img_bytes, "mcp_slidecast", f"slide_{slide.index}_end.png", "image/png")
         
-        # AUDIO: Skip if already exists
-        if slide.audio_url:
-            log_message(f"Slide {slide.index+1}: using existing audio.", Severity.INFO)
-            audio_bytes = await _download_uri(slide.audio_url)
-        else:
-            log_message(f"Slide {slide.index+1}: generating new audio...", Severity.INFO)
-            voice_id = VOICEOVER_STYLES.get(manifest.voiceover_style, "Puck")
-            audio_bytes = await _generate_voiceover_audio(slide.voiceover_script, voice_name=voice_id)
-            if audio_bytes:
-                url = await _upload_bytes(audio_bytes, "mcp_slidecast", f"audio_{slide.index}.wav", "audio/wav")
-                slide.audio_url = url
-                
-        return slide, start_img_bytes, end_img_bytes
+        return slide
 
-    results = await asyncio.gather(*[_gen_slide_assets(s) for s in manifest.slides])
+    updated_slides = await asyncio.gather(*[_gen_slide_assets(s) for s in manifest.slides])
+    manifest.slides = list(updated_slides)
     
-    # 3. Compile PDF
-    updated_slides = [r[0] for r in results]
-    slide_images = [(r[1] or b"", r[2] or b"") for r in results]
-    manifest.slides = updated_slides
+    # 3. Audio
+    manifest = await generate_slidecast_audio_assets(manifest)
     
-    pdf_content = _generate_approval_pdf(manifest.title, manifest.slides, slide_images)
-    pdf_url = await _upload_bytes(pdf_content, "mcp_slidecast", f"approval_document_{int(time.time())}.pdf", "application/pdf")
-    
-    return {
-        "status": "success",
-        "pdf_url": pdf_url,
-        "manifest": manifest.model_dump()
-    }
+    return manifest
 
 async def plan_slide_animation(slide: SlidecastSlide, brand: BrandContext, aspect_ratio: str = "16:9") -> NanomationPlan:
     """
@@ -280,18 +272,76 @@ async def plan_slide_animation(slide: SlidecastSlide, brand: BrandContext, aspec
     response = await _retry_generate_content(
         model=LLM_GEMINI_MODEL_MARKETING_ANALYST,
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.7, response_mime_type="application/json"),
+        config=types.GenerateContentConfig(
+            temperature=0.7, 
+            response_mime_type="application/json",
+            response_schema=NanomationPlan
+        ),
         label="nanomation-plan"
     )
     
-    data = json.loads(response.text)
-    phases = [NanomationPhase(**p) for p in data.get("phases", [])]
+    return NanomationPlan.model_validate_json(response.text)
+
+async def rewrite_image_prompts(manifest: SlidecastManifest, override_instructions: str, brand: BrandContext) -> SlidecastManifest:
+    """Uses LLM to rewrite image prompts for the entire manifest based on instructions."""
+    log_message(f"Rewriting image prompts: {override_instructions}", Severity.INFO)
     
-    return NanomationPlan(
-        topic=data.get("topic", slide.title),
-        target=data.get("target", "Educational animation"),
-        phases=phases
+    prompt = (
+        f"You are the Creative Director for {brand.company_name}.\n"
+        f"TASK: Rewrite the 'image_prompt' and 'end_image_prompt' fields for every slide in the provided manifest based on these new instructions:\n"
+        f"INSTRUCTIONS: {override_instructions}\n\n"
+        f"BRAND RULES: {brand.reference_guidelines[:500]}\n"
+        f"CURRENT MANIFEST JSON:\n{manifest.model_dump_json()}\n\n"
+        f"Output ONLY the complete updated JSON matching the SlidecastManifest schema."
     )
+    
+    response = await _retry_generate_content(
+        model=STORYLINE_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.7, 
+            response_mime_type="application/json",
+            response_schema=SlidecastManifest
+        ),
+        label="rewrite-image-prompts"
+    )
+    
+    new_manifest = SlidecastManifest.model_validate_json(response.text)
+    # Clear existing image URLs to force regeneration
+    for slide in new_manifest.slides:
+        slide.start_image_url = None
+        slide.end_image_url = None
+    return new_manifest
+
+async def rewrite_audio_prompts(manifest: SlidecastManifest, override_instructions: str, brand: BrandContext) -> SlidecastManifest:
+    """Uses LLM to rewrite voiceover scripts for the entire manifest based on instructions."""
+    log_message(f"Rewriting audio prompts: {override_instructions}", Severity.INFO)
+    
+    prompt = (
+        f"You are the Head Copywriter for {brand.company_name}.\n"
+        f"TASK: Rewrite the 'voiceover_script' field for every slide in the provided manifest based on these new instructions:\n"
+        f"INSTRUCTIONS: {override_instructions}\n\n"
+        f"BRAND RULES: {brand.reference_guidelines[:500]}\n"
+        f"CURRENT MANIFEST JSON:\n{manifest.model_dump_json()}\n\n"
+        f"Output ONLY the complete updated JSON matching the SlidecastManifest schema."
+    )
+    
+    response = await _retry_generate_content(
+        model=STORYLINE_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.7, 
+            response_mime_type="application/json",
+            response_schema=SlidecastManifest
+        ),
+        label="rewrite-audio-prompts"
+    )
+    
+    new_manifest = SlidecastManifest.model_validate_json(response.text)
+    # Clear existing audio URLs to force regeneration
+    for slide in new_manifest.slides:
+        slide.audio_url = None
+    return new_manifest
 
 async def update_slide_blueprint(
     manifest: SlidecastManifest,
@@ -325,24 +375,24 @@ async def update_slide_blueprint(
         f"CONTEXT FOR CONTINUITY:\n{context_str}\n\n"
         f"BRAND RULES: {brand.reference_guidelines[:500]}\n"
         f"TASK: Rewrite ONLY the current slide. Ensure it flows perfectly from previous and into next slides.\n"
-        f"Return the updated slide JSON (title, content, image_prompt, voiceover_script)."
+        f"Return the updated slide JSON (title, content, image_prompt, voiceover_script).\n"
+        f"CRITICAL: The 'content' field MUST be a JSON array of strings (e.g., [\"Bullet 1\", \"Bullet 2\"]), NOT a single string."
     )
     
     response = await _retry_generate_content(
         model=STORYLINE_MODEL,
         contents=prompt,
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=SlidecastSlide
+        ),
         label="slide-update"
     )
     
-    new_data = json.loads(response.text)
-    manifest.slides[slide_index] = SlidecastSlide(
-        index=slide_index,
-        title=new_data.get("title", target_slide.title),
-        content=new_data.get("content", target_slide.content),
-        image_prompt=new_data.get("image_prompt", target_slide.image_prompt),
-        voiceover_script=new_data.get("voiceover_script", target_slide.voiceover_script)
-    )
+    new_slide_data = SlidecastSlide.model_validate_json(response.text)
+    
+    # Overwrite the specific slide
+    manifest.slides[slide_index] = new_slide_data
     # Clear assets to force regeneration
     manifest.slides[slide_index].start_image_url = None
     manifest.slides[slide_index].end_image_url = None

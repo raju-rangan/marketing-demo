@@ -5,8 +5,12 @@ export
 BRAND_INPUT := $(if $(BRAND),$(BRAND),$(brand))
 BRAND_ID := $(if $(BRAND_INPUT),$(shell echo "$(BRAND_INPUT)" | tr '[:upper:]' '[:lower:]' | tr ' ' '_'),$(ACTIVE_BRAND))
 
+# Extract BYPASS_AUTH flag if set via env var (e.g. make playground BYPASS_AUTH=1)
+# The default is empty (false).
+BYPASS_AUTH ?=
+
 # Sync brand assets and update .env if needed
-sync-assets: authenticate
+sync-assets: $(if $(BYPASS_AUTH),,authenticate)
 	@if [ -z "$(BRAND_ID)" ]; then echo "❌ ERROR: BRAND is required (or set ACTIVE_BRAND in .env)"; exit 1; fi
 	@if [ ! -d "app/brands/$(BRAND_ID)" ]; then echo "❌ ERROR: Brand folder 'app/brands/$(BRAND_ID)' not found."; exit 1; fi
 	@# Update .env if a brand was explicitly provided
@@ -47,7 +51,7 @@ authenticate:
 	gcloud auth application-default set-quota-project $(GOOGLE_CLOUD_PROJECT)
 
 # Setup local environment and infrastructure
-setup: authenticate
+setup: $(if $(BYPASS_AUTH),,authenticate)
 	@echo "==============================================================================="
 	@echo "| 🛠️ Bootstrapping Infrastructure (Buckets & Config)...                         |"
 	@echo "==============================================================================="
@@ -100,7 +104,7 @@ debug: sync-assets
 
 # Set up a new brand profile
 # Usage: make setup-brand BRAND="Brand Name" [URL="https://brand.com"]
-setup-brand: authenticate
+setup-brand: $(if $(BYPASS_AUTH),,authenticate)
 	@if [ -z "$(BRAND)" ]; then echo "❌ ERROR: BRAND is required. Usage: make setup-brand BRAND=\"Brand Name\""; exit 1; fi
 	uv run -m app.app_utils.onboard_brand --name "$(BRAND)" $(if $(URL),--url "$(URL)")
 	@$(MAKE) sync-assets BRAND="$(BRAND)"

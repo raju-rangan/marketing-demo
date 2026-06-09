@@ -51,7 +51,7 @@ class BrandContext(BaseModel):
 class SlidecastSlide(BaseModel):
     index: int = Field(..., description="The sequence index of the slide.")
     title: str = Field(..., description="The main heading for the slide.")
-    content: str = Field(..., description="The bullet points or main body text.")
+    content: List[str] = Field(..., description="The bullet points or main body text.")
     image_prompt: str = Field(..., description="Detailed prompt for generating the start visual.")
     end_image_prompt: Optional[str] = Field(None, description="Detailed prompt for generating the end visual.")
     voiceover_script: str = Field(..., description="The spoken text for this slide.")
