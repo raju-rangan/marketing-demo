@@ -4,9 +4,9 @@ import os
 import re
 from typing import List
 
-from ...state import LLM_GEMINI_MODEL_MARKETING_ANALYST
-from .core import _retry_generate_content
-from ..schemas import BrandContext
+from app.state import LLM_GEMINI_MODEL_MARKETING_ANALYST
+from app.mcp_server.generators.core import _retry_generate_content
+from app.mcp_server.schemas import BrandContext
 from google.genai import types
 
 logger = logging.getLogger(__name__)

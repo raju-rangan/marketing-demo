@@ -3,9 +3,9 @@ import random
 
 from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import VEO_MODEL
-from .core import client, ensure_gs_uri
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import VEO_MODEL
+from app.mcp_server.generators.core import client, ensure_gs_uri
 
 def _sanitize_veo_prompt(prompt: str) -> str:
     return prompt.replace("\n", " ").strip()[:2000]

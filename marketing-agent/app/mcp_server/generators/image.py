@@ -4,9 +4,9 @@ import traceback
 
 from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import GEMINI_IMAGE_MODEL
-from .core import client
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import GEMINI_IMAGE_MODEL
+from app.mcp_server.generators.core import client
 
 def _get_image_mime_type(data: bytes) -> str:
     """Detects image mime type from bytes."""

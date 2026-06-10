@@ -5,16 +5,16 @@ import time
 from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
 
-from .generators import (
+from app.mcp_server.generators import (
     _generate_gemini_image,
     _generate_single_veo_clip,
     _generate_voiceover_audio,
     _generate_lyria_music,
     _get_brand_wall_directive,
 )
-from .generators.core import _download_uri, _upload_bytes
-from ..adk_common.utils import utils_agents, utils_gcs
-from ..state import GOOGLE_CLOUD_BUCKET_ARTIFACTS
+from app.mcp_server.generators.core import _download_uri, _upload_bytes
+from app.adk_common.utils import utils_agents, utils_gcs
+from app.state import GOOGLE_CLOUD_BUCKET_ARTIFACTS
 
 logger = logging.getLogger(__name__)
 

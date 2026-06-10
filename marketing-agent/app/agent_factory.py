@@ -25,7 +25,7 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParamet
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.models import Gemini
 
-from .state import (
+from app.state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     CHOSEN_CAMPAIGN_IDEA_STATE_KEY,
     CHOSEN_ASSET_SHEET_ID_STATE_KEY,
@@ -35,7 +35,7 @@ from .state import (
     DEMO_COMPANY_NAME,
     ROOT_AGENT_MODEL,
 )
-from .adk_common.utils.utils_gcs import get_public_url
+from app.adk_common.utils.utils_gcs import get_public_url
 
 # ============================================================
 # Dynamic Instruction Provider
@@ -114,15 +114,14 @@ marketing_skills = SkillToolset(
 # ============================================================
 
 # Define the MCP Toolset connection
-# We use StdioConnectionParams to explicitly increase the ADK timeout to 600 seconds (10 mins).
-# In ADK's Stdio implementation, this value dictates BOTH the connection timeout and the execution timeout.
 video_production_mcp = MCPToolset(
     connection_params=StdioConnectionParams(
         server_params=StdioServerParameters(
-            command='uv',
-            args=['run', '--package', 'marketing-agent', 'python', '-m', 'app.mcp.server'],
+            command=sys.executable,
+            args=['-m', 'app.mcp_server.server'],
+            env={**os.environ} # Pass all current environment variables
         ),
-        timeout=600.0  # 10 minutes to support VEO generation
+        timeout=1200.0  # 20 minutes to support longer VEO generation
     )
 )
 

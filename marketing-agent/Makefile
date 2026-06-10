@@ -74,11 +74,11 @@ setup: $(if $(BYPASS_AUTH),,authenticate)
 
 # Launch the FastMCP Server
 # Usage: make mcp-start
-mcp-start: sync-assets
+mcp-start:
 	@echo "==============================================================================="
 	@echo "| 🚀 Starting the FastMCP Server...                                           |"
 	@echo "==============================================================================="
-	export ACTIVE_BRAND=$(BRAND_ID); uv run python -m app.mcp.server
+	export ACTIVE_BRAND=$(BRAND_ID); uv run python -m app.mcp_server.server
 
 # Launch local dev playground
 # Usage: make playground [BRAND=bofa]

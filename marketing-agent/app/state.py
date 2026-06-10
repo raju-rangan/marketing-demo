@@ -23,12 +23,12 @@ from .adk_common.utils.constants import (
 # Model Configuration (Load first to avoid import issues)
 # ============================================================
 
-GEMINI_IMAGE_MODEL = get_required_env_var("IMAGE_GENERATION_MODEL")
-GEMINI_TTS_MODEL = get_required_env_var("AUDIO_TTS_GENERATION_MODEL")
-GEMINI_TTS_VOICE = get_required_env_var("AUDIO_TTS_VOICE_NAME")
-VEO_MODEL = get_required_env_var("VIDEO_GENERATION_MODEL")
+GEMINI_IMAGE_MODEL = get_optional_env_var("IMAGE_GENERATION_MODEL", "gemini-3.1-flash-image")
+GEMINI_TTS_MODEL = get_optional_env_var("AUDIO_TTS_GENERATION_MODEL", "gemini-2.5-pro-tts")
+GEMINI_TTS_VOICE = get_optional_env_var("AUDIO_TTS_VOICE_NAME", "Charon")
+VEO_MODEL = get_optional_env_var("VIDEO_GENERATION_MODEL", "veo-3.1-generate-001")
 VEO_CLIP_DURATION = int(get_optional_env_var("VIDEO_DEFAULT_DURATION", "4"))
-LLM_GEMINI_MODEL_MARKETING_ANALYST = get_required_env_var("LLM_GEMINI_MODEL_MARKETING_ANALYST")
+LLM_GEMINI_MODEL_MARKETING_ANALYST = get_optional_env_var("LLM_GEMINI_MODEL_MARKETING_ANALYST", "gemini-3.1-flash-lite")
 STORYLINE_MODEL = get_optional_env_var("STORYLINE_MODEL", "gemini-3.1-pro-preview")
 ROOT_AGENT_MODEL = get_optional_env_var("ROOT_AGENT_MODEL", "gemini-3-flash-preview")
 LYRIA_MODEL = get_optional_env_var("LYRIA_MODEL", "lyria-3-pro-preview")

@@ -52,6 +52,7 @@ image_prompt = (
     f"I have provided {len(reference_images)} reference images. "
     "Extract all main characters from these images and create one comprehensive, consolidated character reference sheet. "
     "Each character must be shown as a crisp, full-body representation to serve as a definitive guide for animators. "
+    "Add a name for each character if it is visible in the reference images. If not, be creative and assign a name. Add an arrow pointing to each character with a label of their name. "
     "CRITICAL: Maintain the EXACT artistic style, animation style, color palette, lighting, and rendering techniques found in the provided source images. "
     "The final generated image MUST look exactly like a frame from the same animation as the source images. "
     "Arrange them in a unified composition. On the far right side of the canvas, "

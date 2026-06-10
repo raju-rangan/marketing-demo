@@ -29,10 +29,10 @@ from google.api_core.client_info import ClientInfo
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
-from ..dtos.generated_media import GeneratedMedia
-from .constants import get_required_env_var
-from .utils_logging import Severity, log_message
-from . import utils_agents
+from app.adk_common.dtos.generated_media import GeneratedMedia
+from app.adk_common.utils.constants import get_required_env_var
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.adk_common.utils import utils_agents
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
 GOOGLE_CLOUD_PROJECT = get_required_env_var("GOOGLE_CLOUD_PROJECT")

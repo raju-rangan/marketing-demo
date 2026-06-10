@@ -467,12 +467,33 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
             log_message(f"End card overlay failed: {e}", Severity.ERROR)
             return video_bytes
 
-def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9") -> bytes | None:
+def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9", include_text_overlay: bool = False) -> bytes | None:
     """
     Compiles a slidecast video using ffmpeg.
     """
     if not slides:
         return None
+
+    def _sanitize_ffmpeg_text(text: str) -> str:
+        """
+        Robustly escapes text for FFmpeg's drawtext filter.
+        FFmpeg parsing is notoriously complex, requiring multiple layers of escaping
+        for colons, quotes, backslashes, and percentage signs.
+        """
+        if not text:
+            return ""
+        # 1. Escape backslashes first so we don't escape our own escapes
+        text = text.replace("\\", "\\\\")
+        # 2. Escape colons (filter delimiter)
+        text = text.replace(":", "\\:")
+        # 3. Escape percentage signs (used for drawtext variables like %{pts})
+        text = text.replace("%", "\\\\%")
+        # 4. Handle single quotes. Inside a ' ' wrapped string in drawtext, 
+        # a literal single quote is represented by placing it outside the quotes, 
+        # or more simply, we use a smart quote to avoid the parser headache entirely
+        # as it provides the cleanest visual output without risking syntax breaks.
+        text = text.replace("'", "’")
+        return text
 
     # Set canvas dimensions based on aspect ratio
     if aspect_ratio == "9:16":
@@ -501,7 +522,9 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
             v_idx = input_count
             input_count += 1
-            text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
+            
+            # Use the robust sanitization function
+            text = _sanitize_ffmpeg_text(slide.get("text_overlay", ""))
 
             # Canvas string
             canvas_str = f"scale={canvas_width}:{canvas_height}:force_original_aspect_ratio=decrease,pad={canvas_width}:{canvas_height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
@@ -530,7 +553,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
                 inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
                 v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
 
-            if text:
+            if include_text_overlay and text:
                 v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
 
             v_filter = v_filter.rstrip(",")
@@ -562,7 +585,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
             with open(output_path, "rb") as f:
                 return f.read()
         except subprocess.CalledProcessError as e:
-            err_msg = e.stderr.decode() if e.stderr else str(e)
+            err_msg = e.stderr.decode('utf-8', errors='ignore') if e.stderr else str(e)
             print(f"FFMPEG Error details:\n{err_msg}")
             log_message(f"Slidecast compilation failed: {err_msg}", Severity.ERROR)
             return None

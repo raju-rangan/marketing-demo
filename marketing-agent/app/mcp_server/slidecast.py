@@ -2,8 +2,8 @@ import json
 import logging
 from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
-from .schemas import SlidecastManifest, BrandContext, NanomationPlan
-from .generators.slidecast import (
+from app.mcp_server.schemas import SlidecastManifest, BrandContext, NanomationPlan
+from app.mcp_server.generators.slidecast import (
     generate_slidecast_manifest, 
     update_slide_blueprint, 
     plan_slide_animation, 
@@ -12,12 +12,12 @@ from .generators.slidecast import (
     rewrite_image_prompts,
     rewrite_audio_prompts
 )
-from .generators.core import _upload_bytes
-from .generators.image import _generate_gemini_image
-from .generators.audio import _generate_voiceover_audio
-from .generators.video import _generate_single_veo_clip
-from ..adk_common.utils.utils_logging import Severity, log_message
-from ..state import SLIDE_STYLES, VOICEOVER_STYLES, CHOSEN_SLIDE_STYLE_STATE_KEY, CHOSEN_VOICEOVER_STYLE_STATE_KEY, ANIMATE_SLIDECAST_STATE_KEY
+from app.mcp_server.generators.core import _upload_bytes
+from app.mcp_server.generators.image import _generate_gemini_image
+from app.mcp_server.generators.audio import _generate_voiceover_audio
+from app.mcp_server.generators.video import _generate_single_veo_clip
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import SLIDE_STYLES, VOICEOVER_STYLES, CHOSEN_SLIDE_STYLE_STATE_KEY, CHOSEN_VOICEOVER_STYLE_STATE_KEY, ANIMATE_SLIDECAST_STATE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +83,8 @@ def add_slidecast_tools(mcp: FastMCP):
     async def generate_story_arc(
         company_name: str,
         slide_style: str,
-        animate_slides: bool,
         voiceover_style: str,
+        animate_slides: bool=True,
         use_preapproved_style: bool = False,
         urls: List[str] = None,
         reference_guidelines: str = "",
@@ -102,6 +102,7 @@ def add_slidecast_tools(mcp: FastMCP):
         
         ARGS:
         - company_name, slide_style, animate_slides, voiceover_style: Required context.
+        - animate should be True if the user wants Veo animations, False for static slides.
         - use_preapproved_style: Whether to use the preapproved brand identity style.
         - urls: Source material links provided by the user.
         - duration_seconds: Expected video length (e.g., 60 for Shorts, 300 for Slidecasts).
@@ -188,6 +189,11 @@ def add_slidecast_tools(mcp: FastMCP):
         WHEN TO USE:
         Gate 1.6. Call this AFTER the text and prompts are approved, but BEFORE generating the Approval PDF.
         
+        USER EXPECTATION MANAGEMENT (CRITICAL):
+        Before calling this tool for a full render (when slide_index is null), you MUST send a message to the user informing them that this process will take time. 
+        Use this heuristic: ~4 minutes for a 1-minute video, ~7-8 minutes for a 5-minute video. 
+        Example: "I am now rendering the visual assets for your slides. This is a complex process that takes about 7-8 minutes for a video of this length. I'll notify you as soon as the approval PDF is ready!"
+        
         ARGS:
         - manifest: The current SlidecastManifest.
         - slide_index (int, optional): If provided, ONLY re-renders the image for that specific slide (useful for surgical edits). If null, renders missing images for all slides.
@@ -224,7 +230,7 @@ def add_slidecast_tools(mcp: FastMCP):
                     ref_images = []
                     if preapproved_img_bytes:
                         ref_images = [preapproved_img_bytes]
-                        styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                        styled_prompt += "\n\nCRITICAL IDENTITY LINK: The characters described in the prompt above correspond EXACTLY to the characters shown in the attached reference image (Image 1). Use Image 1 as the definitive source for both character identity (features, appearance, apparel) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
                     start_img_bytes = await _generate_gemini_image(styled_prompt, ref_images, label=f"slide_{slide.index}_start", aspect_ratio=manifest.aspect_ratio)
                     if start_img_bytes:
                         slide.start_image_url = await _upload_bytes(start_img_bytes, "mcp_slidecast", f"slide_{slide.index}_start.png", "image/png")
@@ -239,12 +245,13 @@ def add_slidecast_tools(mcp: FastMCP):
                     styled_prompt = f"{slide.end_image_prompt}\n\nBRAND RULES:\n{brand.reference_guidelines[:500]}"
                     if preapproved_img_bytes:
                         ref_images = [preapproved_img_bytes]
+                        identity_link = "\n\nCRITICAL IDENTITY LINK: The characters described in the prompt above correspond EXACTLY to the characters shown in the attached reference image (Image 1). Use Image 1 as the definitive source for both character identity (features, appearance, apparel) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
                         if start_img_bytes:
                             ref_images.append(start_img_bytes)
-                            styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                            styled_prompt += identity_link
                             styled_prompt += "\nUse Image 2 as the temporal structural guide for consistency, ensuring the character's pose and outline transition naturally from the state established in Image 2."
                         else:
-                            styled_prompt += "\n\nUse Image 1 as the definitive source for both character identity (features, appearance) AND the Primary Style Reference (color palette, lighting, rendering technique). Fully re-render the subject into the style of Image 1."
+                            styled_prompt += identity_link
                     else:
                         if start_img_bytes:
                             ref_images = [start_img_bytes]
@@ -319,6 +326,11 @@ def add_slidecast_tools(mcp: FastMCP):
         
         WHEN TO USE:
         Gate 3. Call this AFTER the user has approved the PDF, and ONLY IF the user requested an 'Animated' video format.
+        
+        USER EXPECTATION MANAGEMENT (CRITICAL):
+        Before calling this tool for a full render (when slide_index is null), you MUST send a message to the user informing them that video generation is a highly intensive process that will take significant time. 
+        Use this heuristic: ~4 minutes for a 1-minute video, ~7-8 minutes for a 5-minute video. 
+        Example: "I am now rendering the high-quality animated video segments. This is a computationally intensive process that takes about 7-8 minutes for a video of this length. Grab a coffee, and I'll notify you as soon as the final compilation is ready!"
         
         ARGS:
         - manifest: The approved SlidecastManifest containing rendered start/end images.

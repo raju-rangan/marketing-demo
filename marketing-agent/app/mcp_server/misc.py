@@ -2,8 +2,8 @@ import json
 import logging
 from typing import List
 from mcp.server.fastmcp import FastMCP
-from .generators.misc import get_market_trends, query_kb, load_brand_context, register_assets_stateless, generate_campaign_briefs
-from ..adk_common.utils.utils_gcs import get_public_url as gcs_get_public_url
+from app.mcp_server.generators.misc import get_market_trends, query_kb, load_brand_context, register_assets_stateless, generate_campaign_briefs
+from app.adk_common.utils.utils_gcs import get_public_url as gcs_get_public_url
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,8 @@
 import json
 import logging
 from mcp.server.fastmcp import FastMCP
-from .schemas import StoryboardManifest, StoryboardAct
-from .generators import _generate_storyline
+from app.mcp_server.schemas import StoryboardManifest, StoryboardAct
+from app.mcp_server.generators import _generate_storyline
 
 logger = logging.getLogger(__name__)
 

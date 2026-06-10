@@ -3,9 +3,9 @@ import random
 
 from google import genai
 
-from ...adk_common.utils.utils_logging import log_message, Severity
-from ...adk_common.utils import utils_agents, utils_gcs
-from ...state import GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_BUCKET_ARTIFACTS
+from app.adk_common.utils.utils_logging import log_message, Severity
+from app.adk_common.utils import utils_agents, utils_gcs
+from app.state import GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_BUCKET_ARTIFACTS
 
 # ============================================================
 # Core Generation Utilities

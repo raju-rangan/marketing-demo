@@ -9,13 +9,13 @@ from fpdf import FPDF
 
 from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import STORYLINE_MODEL, SLIDE_STYLES, VOICEOVER_STYLES, LOGO_IMAGE_URI_STATE_KEY, LLM_GEMINI_MODEL_MARKETING_ANALYST
-from .core import _retry_generate_content, _download_uri, _upload_bytes, client
-from .image import _generate_gemini_image
-from .audio import _generate_voiceover_audio
-from .video import _generate_single_veo_clip
-from ..schemas import SlidecastManifest, SlidecastSlide, BrandContext, NanomationPlan, NanomationPhase
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import STORYLINE_MODEL, SLIDE_STYLES, VOICEOVER_STYLES, LOGO_IMAGE_URI_STATE_KEY, LLM_GEMINI_MODEL_MARKETING_ANALYST
+from app.mcp_server.generators.core import _retry_generate_content, _download_uri, _upload_bytes, client
+from app.mcp_server.generators.image import _generate_gemini_image
+from app.mcp_server.generators.audio import _generate_voiceover_audio
+from app.mcp_server.generators.video import _generate_single_veo_clip
+from app.mcp_server.schemas import SlidecastManifest, SlidecastSlide, BrandContext, NanomationPlan, NanomationPhase
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,8 @@ async def generate_slidecast_manifest(
     Restores dynamic scaling and detailed persona prompts from legacy.
     """
     duration_minutes = duration_seconds / 60.0
-    total_word_target = max(60, int(duration_minutes * 160))
+    # Increase base word target by 10% for faster pacing
+    total_word_target = max(60, int((duration_minutes * 160) * 1.1))
 
     if duration_seconds <= 60:
         # Shorts mode: high frequency of visual changes
@@ -134,10 +135,24 @@ async def generate_slidecast_manifest(
         # Long-form mode: educational pacing
         num_slides = max(12, min(25, int(duration_minutes * 5)))
 
+    # Distribute the increased word count across slides
     words_per_slide = max(10, total_word_target // num_slides)
 
     if use_preapproved_style:
-        style_desc = "CRITICAL: Do NOT write generic style descriptions (e.g., 'Cinematic lighting, realistic'). The style will be strictly enforced downstream by a brand-provided reference image. Focus the image_prompt SOLELY on the subject matter, the character's actions, and the composition of the scene."
+        style_desc = (
+            "CRITICAL: The visual style is strictly enforced by a master reference image applied later in the pipeline. "
+            "THEREFORE, DO NOT INCLUDE ANY ARTISTIC DIRECTIVES IN YOUR PROMPTS. "
+            "Your `image_prompt` and `end_image_prompt` MUST ONLY describe the raw subject matter, character actions, objects, and spatial composition. "
+            "PROHIBITED WORDS: Do not use terms like 'style', 'lighting', 'aesthetic', 'vector', 'realistic', '3D', 'render', or 'colors'. "
+            "Focus entirely on what is happening in the scene."
+        )
+        if brand.style_reference_image_uri:
+            style_desc += (
+                "\n\nCRITICAL IDENTITY LINK: An image containing the approved character(s) is attached. "
+                "You MUST analyze this image to understand the visual identity of the characters. "
+                "If your storyline features specific named characters, you MUST explicitly use their names in the `image_prompt` and `end_image_prompt` (e.g., 'Aisha is reviewing blueprints', not 'A woman is reviewing blueprints'). "
+                "This ensures the downstream image generator applies the exact face and identity from the reference image."
+            )
     else:
         style_desc = SLIDE_STYLES.get(slide_style, slide_style)
 
@@ -156,16 +171,39 @@ async def generate_slidecast_manifest(
         f"VISUAL STYLE: {slide_style}\n"
         f"STYLE DIRECTIVE: {style_desc}\n\n"
         f"BRAND MANDATE:\n{brand.reference_guidelines[:1000]}\n"
-        # Enable this if you want to enforce logo presence in the image generation step, but it is an issue if you want to enforce strict branding.
-        # f"- Every image prompt MUST include: 'Include the {brand.company_name} logo in the bottom right corner.'\n"
-        f"- ALWAYS include an 'end_image_prompt'. This MUST represent the scene 5 minutes later, with distinct, meaningful motion (e.g., character movement, changed object states, or shifted camera perspective) to ensure compelling 8-second animation.\n\n"
+        f"BRAND SAFETY MANDATE: The company name ({brand.company_name}) or brand must NEVER be associated with or appear alongside negative concepts, struggles, or problems. Only associate the brand with solutions, positive outcomes, and empowerment.\n"
+    )
+
+    if animate_slides:
+        prompt += (
+            f"\nCRITICAL ANIMATION DIRECTIVE: The user requested an ANIMATED video. "
+            f"You MUST provide a distinct 'end_image_prompt' for EVERY slide. "
+            f"The 'end_image_prompt' must describe the scene 5 minutes later, showing distinct, meaningful motion (e.g., character moved to a new pose, camera shifted perspective, objects changed state) to ensure the animation model has clear start and end states to interpolate between.\n\n"
+        )
+    else:
+        prompt += (
+            f"\nCRITICAL STATIC DIRECTIVE: The user requested a STATIC video. "
+            f"You MUST set 'end_image_prompt' to an empty string (\"\") for all slides.\n\n"
+        )
+
+    prompt += (
         f"Output ONLY valid JSON matching the schema with 'title', 'slides' (index, title, content, image_prompt, end_image_prompt, voiceover_script).\n"
         f"CRITICAL: The 'content' field in each slide MUST be a JSON array of strings (e.g., [\"Bullet 1\", \"Bullet 2\"]), NOT a single string."
     )
 
+    contents = prompt
+    if use_preapproved_style and brand.style_reference_image_uri:
+        from .core import _download_uri
+        ref_bytes = await _download_uri(brand.style_reference_image_uri)
+        if ref_bytes:
+            contents = [
+                types.Part.from_bytes(data=ref_bytes, mime_type="image/png"),
+                prompt
+            ]
+
     response = await _retry_generate_content(
         model=STORYLINE_MODEL,
-        contents=prompt,
+        contents=contents,
         config=types.GenerateContentConfig(
             temperature=0.7, 
             response_mime_type="application/json",
@@ -197,9 +235,14 @@ async def produce_assets(manifest: SlidecastManifest, brand: BrandContext) -> Sl
     """Generates images and audio assets for approved manifest."""
     log_message(f"Starting asset production for: {manifest.title}", Severity.INFO)
     
-    # 1. Load brand assets for reference
-    logo_bytes = await _download_uri(brand.logo_uri) if brand.logo_uri else None
-    ref_images = [logo_bytes] if logo_bytes else []
+    # 1. Initialize reference images
+    # We purposefully DO NOT pass the logo_bytes here. The logo is overlaid 
+    # strictly downstream via FFmpeg in the compilation step. Passing it here 
+    # as a reference image confuses the diffusion model, causing it to hallucinate 
+    # the logo onto random surfaces (walls, shirts, etc.) inside the generated scene.
+    # logo_bytes = await _download_uri(brand.logo_uri) if brand.logo_uri else None
+    # ref_images = [logo_bytes] if logo_bytes else []
+    ref_images = []
     
     # 2. Process slides in parallel
     async def _gen_slide_assets(slide: SlidecastSlide):

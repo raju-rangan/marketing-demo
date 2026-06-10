@@ -5,9 +5,9 @@ import time
 from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
 
-from .schemas import RenderJob, SlidecastManifest
-from .assets import _download_uri, _upload_bytes
-from ..utils.media import (
+from app.mcp_server.schemas import RenderJob, SlidecastManifest
+from app.mcp_server.assets import _download_uri, _upload_bytes
+from app.utils.media import (
     stitch_videos,
     mix_audio_onto_video,
     overlay_logo_on_video,
@@ -154,6 +154,15 @@ def add_production_tools(mcp: FastMCP):
             
             if not final_video:
                 return json.dumps({"status": "error", "details": "Slidecast rendering failed."})
+
+            # Overlay Logo if available
+            from .generators.misc import load_brand_context
+            brand_context = await load_brand_context()
+            if brand_context and brand_context.logo_uri:
+                logo_bytes = await _download_uri(brand_context.logo_uri)
+                if logo_bytes:
+                    logger.info("Adding brand logo overlay to slidecast...")
+                    final_video = overlay_logo_on_video(final_video, logo_bytes)
 
             # 5. Upload
             ts = int(time.time() * 1000)

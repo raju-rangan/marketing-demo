@@ -2,9 +2,9 @@ import json
 
 from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import STORYLINE_MODEL
-from .core import _get_brand_wall_directive, _retry_generate_content
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import STORYLINE_MODEL
+from app.mcp_server.generators.core import _get_brand_wall_directive, _retry_generate_content
 
 async def _generate_storyline(company_name: str, product_name: str, rationale: str, reference_guidelines: str = "", customer_persona: str = "", duration_seconds: int = 24) -> dict:
     CLIP_SEC = 8

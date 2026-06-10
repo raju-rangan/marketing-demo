@@ -4,9 +4,9 @@ import wave
 
 from google.genai import types
 
-from ...adk_common.utils.utils_logging import Severity, log_message
-from ...state import LYRIA_MODEL, GEMINI_TTS_MODEL
-from .core import client, _retry_generate_content
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.state import LYRIA_MODEL, GEMINI_TTS_MODEL
+from app.mcp_server.generators.core import client, _retry_generate_content
 
 async def _generate_lyria_music(lyria_prompt: str, product_name: str) -> bytes | None:
     log_message(f"🎼 [LYRIA GEN PROMPT]: {lyria_prompt}", Severity.INFO)
@@ -62,10 +62,12 @@ async def _generate_voiceover_audio(script: str, voice_name: str = None) -> byte
                        contents=script,
                        config=types.GenerateContentConfig(
                           response_modalities=["AUDIO"],
+                          # system_instruction="Speak at a fast and energetic pace, with a tone that conveys excitement and confidence about the product. Use dynamic intonation to emphasize key features and benefits, and maintain a friendly yet persuasive demeanor throughout.",
                           speech_config=types.SpeechConfig(
                              voice_config=types.VoiceConfig(
                                 prebuilt_voice_config=types.PrebuiltVoiceConfig(
                                    voice_name=selected_voice,
+                                   
                                 )
                              )
                           ),

@@ -24,7 +24,7 @@ import time
 from typing import Optional
 
 from google.adk.tools.tool_context import ToolContext
-from .constants import CONTEXT_UI_PREFIX, get_optional_env_var, get_required_env_var
+from app.adk_common.utils.constants import CONTEXT_UI_PREFIX, get_optional_env_var, get_required_env_var
 from google.genai import types
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")

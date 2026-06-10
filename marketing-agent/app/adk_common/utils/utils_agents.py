@@ -24,9 +24,9 @@ from urllib.parse import urlparse
 
 import requests
 
-from . import utils_gcs
-from .constants import get_required_env_var
-from .utils_logging import Severity, log_function_call, log_message
+from app.adk_common.utils import utils_gcs
+from app.adk_common.utils.constants import get_required_env_var
+from app.adk_common.utils.utils_logging import Severity, log_function_call, log_message
 
 GOOGLE_CLOUD_BUCKET_ARTIFACTS = get_required_env_var("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
 
