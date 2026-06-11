@@ -478,6 +478,7 @@ def deploy_agent_engine_app(
     # Set deployment-specific environment variables
     env_vars["PROJECT_ID"] = project
     env_vars["GOOGLE_CLOUD_REGION"] = location
+    env_vars["AGENT_VERSION"] = "5.20260410.1" # Manually setting version for deployment
     env_vars["NUM_WORKERS"] = str(num_workers)
 
     # Enable telemetry by default for Agent Engine
