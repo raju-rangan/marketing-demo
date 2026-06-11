@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import sys
 import json
 from google.adk.agents import Agent
 from google.adk.apps import App
@@ -20,9 +21,11 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.skills import load_skill_from_dir
 from google.adk.tools import AgentTool
 from google.adk.tools.skill_toolset import SkillToolset
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.models import Gemini
 
-from .state import (
+from app.state import (
     PRODUCT_COMPANY_NAME_STATE_KEY,
     CHOSEN_CAMPAIGN_IDEA_STATE_KEY,
     CHOSEN_ASSET_SHEET_ID_STATE_KEY,
@@ -30,31 +33,9 @@ from .state import (
     REFERENCE_GUIDELINES_STATE_KEY,
     ASSET_REGISTRY_STATE_KEY,
     DEMO_COMPANY_NAME,
+    ROOT_AGENT_MODEL,
 )
-from .utils.utils_gcs import get_public_url
-
-# Import tools
-# from .tools.tools_campaign import (
-#     # setup_product_campaign,
-#     # get_selected_brief,
-# )
-from .tools.tools_misc import (
-    select_brand_preset,
-    query_internal_knowledge_base,
-    process_user_uploads,
-    run_production_test,
-    search_trends,
-)
-
-from .tools.tools_slidecast import (
-    generate_slidecast_storyboard,
-    update_slidecast_slide,
-    update_storyboard_visual_style,
-    preview_slidecast_assets,
-    finalize_slidecast_video,
-    select_slidecast_style,
-    generate_slide_animation_plan,
-)
+from app.adk_common.utils.utils_gcs import get_public_url
 
 # ============================================================
 # Dynamic Instruction Provider
@@ -132,28 +113,26 @@ marketing_skills = SkillToolset(
 # Root Agent Definition
 # ============================================================
 
+# Define the MCP Toolset connection
+video_production_mcp = MCPToolset(
+    connection_params=StdioConnectionParams(
+        server_params=StdioServerParameters(
+            command=sys.executable,
+            args=['-m', 'app.mcp_server.server'],
+            env={**os.environ} # Pass all current environment variables
+        ),
+        timeout=1200.0  # 20 minutes to support longer VEO generation
+    )
+)
+
 root_agent = Agent(
     name="marketing_agent",
-    model=Gemini(model="gemini-3-flash-preview"),
+    model=Gemini(model=ROOT_AGENT_MODEL),
     instruction=_dynamic_instruction_provider,
     description="Video-Focused Marketing Agent. Handles long-form Slidecasts and short-form video generation.",
     tools=[
+        video_production_mcp,
         marketing_skills,
-        # setup_product_campaign,
-        # get_selected_brief,
-        select_brand_preset,
-        query_internal_knowledge_base,
-        process_user_uploads,
-        run_production_test,
-        get_public_url,
-        search_trends,
-        generate_slidecast_storyboard,
-        update_slidecast_slide,
-        update_storyboard_visual_style,
-        preview_slidecast_assets,
-        finalize_slidecast_video,
-        select_slidecast_style,
-        generate_slide_animation_plan,
     ],
 )
 

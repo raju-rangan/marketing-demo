@@ -16,20 +16,27 @@
 # pylint: disable=C0114, C0301, C0415, W0404, W0612, W0718, W1309, W1405
 import io
 import mimetypes
+import os
+import datetime
 from typing import Any
 from urllib.parse import unquote, urlparse, urlunparse
 
-from app.adk_common.utils.utils_logging import Severity, log_message
+import google.auth
+from google.auth.transport.requests import Request
+from google.auth import impersonated_credentials
 from google.api_core import exceptions
 from google.api_core.client_info import ClientInfo
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
-from ..dtos.generated_media import GeneratedMedia
-from .constants import get_required_env_var
+from app.adk_common.dtos.generated_media import GeneratedMedia
+from app.adk_common.utils.constants import get_required_env_var
+from app.adk_common.utils.utils_logging import Severity, log_message
+from app.adk_common.utils import utils_agents
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
 GOOGLE_CLOUD_PROJECT = get_required_env_var("GOOGLE_CLOUD_PROJECT")
+GOOGLE_CLOUD_BUCKET_ARTIFACTS = get_required_env_var("GOOGLE_CLOUD_BUCKET_ARTIFACTS")
 USER_AGENT = f"cde/agentspace-tahoe-demo/{AGENT_VERSION}"
 
 GCS_AUTHENTICATED_DOMAIN = "https://storage.cloud.google.com/"
@@ -569,4 +576,103 @@ def generate_min_image(source_blob_name: str):
         min_blob.upload_from_string(min_img_bytes, content_type=blob.content_type or 'image/png')
 
     return min_blob_name
+
+
+def get_public_url(blob_path: str) -> str:
+    """Generates a secure Signed URL using IAM impersonation (Delegated method)."""
+    if not blob_path:
+        return ""
+
+    # 1. Clean and Extract Path
+    raw_path = blob_path
+    bucket_name = GOOGLE_CLOUD_BUCKET_ARTIFACTS
+
+    # Strip existing query parameters to avoid double-signing or path corruption
+    if "?" in raw_path:
+        raw_path = raw_path.split("?", 1)[0]
+
+    if raw_path.startswith("gs://"):
+        trimmed = raw_path[5:]
+        parts = trimmed.split("/", 1)
+        if len(parts) > 1:
+            bucket_name, raw_path = parts[0], parts[1]
+    elif "storage.cloud.google.com/" in raw_path:
+        parts = raw_path.split("storage.cloud.google.com/", 1)[1].split("/", 1)
+        if len(parts) > 1:
+            bucket_name, raw_path = parts[0], parts[1]
+    elif "storage.googleapis.com/" in raw_path:
+        parts = raw_path.split("storage.googleapis.com/", 1)[1].split("/", 1)
+        if len(parts) > 1:
+            bucket_name, raw_path = parts[0], parts[1]
+
+    # Ensure no leading slashes which break the signature
+    raw_path = raw_path.lstrip("/")
+
+    # 2. Generate a Signed URL using IAM
+    try:
+        project_id = os.environ.get("PROJECT_ID") or GOOGLE_CLOUD_PROJECT
+        credentials, _ = google.auth.default()
+
+        signing_sa_env = os.environ.get("SIGNING_SERVICE_ACCOUNT")
+        active_email = getattr(credentials, "service_account_email", "N/A")
+
+        # Ensure we have an active token for the source identity
+        if not credentials.token:
+            credentials.refresh(Request())
+        
+        # DELEGATED SIGNING (Impersonation)
+        # We must use impersonated_credentials to ensure the signature matches the identity
+        if signing_sa_env and signing_sa_env != active_email:
+            credentials = impersonated_credentials.Credentials(
+                source_credentials=credentials,
+                target_principal=signing_sa_env,
+                target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            signer_email = signing_sa_env
+        else:
+            signer_email = active_email
+
+        if not signer_email or signer_email == "default" or signer_email == "N/A":
+             return f"https://storage.cloud.google.com/{bucket_name}/{raw_path}"
+
+        storage_client = storage.Client(project=project_id, credentials=credentials)
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(raw_path)
+
+        # Signing Configuration
+        # Reduce expiration to 12 hours (common security policy limit)
+        signed_url_args = {
+            "version": "v4",
+            "expiration": datetime.timedelta(hours=12),
+            "method": "GET",
+            "service_account_email": signer_email,
+        }
+        
+        # If NOT impersonating, pass the access_token for the direct signing API
+        if not isinstance(credentials, impersonated_credentials.Credentials):
+            signed_url_args["access_token"] = credentials.token
+
+        signed_url = blob.generate_signed_url(**signed_url_args)
+        return signed_url
+
+    except Exception as e:
+        log_message(f"[GCS ERROR] {raw_path}: {e}", Severity.WARNING)
+        return f"gs://{bucket_name}/{raw_path}"
+
+def set_output_folder(tool_context):
+    """Sets global OUTPUT_FOLDER to {session_id}/ for isolation."""
+    from app.utils.context import set_current_output_folder
+    
+    # Isolate by Session ID (guarantees a unique ID per conversation)
+    session_id = utils_agents.get_or_create_unique_session_id(
+        tool_context.state, 
+        fallback_session_id=tool_context.session.id
+    )
+    
+    # Final isolated path: session_id/
+    new_folder = f"{session_id}"
+    tool_context.state["CURRENT_OUTPUT_FOLDER"] = new_folder
+    set_current_output_folder(new_folder)
+    log_message(f"Output folder isolated by session: {new_folder}", Severity.INFO)
+    return new_folder
 

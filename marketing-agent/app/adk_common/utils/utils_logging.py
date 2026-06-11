@@ -18,12 +18,13 @@ import asyncio
 import enum
 import functools
 import inspect
+import os
 import sys
 import time
 from typing import Optional
 
 from google.adk.tools.tool_context import ToolContext
-from .constants import CONTEXT_UI_PREFIX, get_optional_env_var, get_required_env_var
+from app.adk_common.utils.constants import CONTEXT_UI_PREFIX, get_optional_env_var, get_required_env_var
 from google.genai import types
 
 AGENT_VERSION = get_required_env_var("AGENT_VERSION")
@@ -36,13 +37,7 @@ class Severity(enum.Enum):
 
 
 def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
-    """Logs a message with a severity and optional prefix.
-
-    Args:
-        message: The message to log.
-        severity: The severity of the log (DEBUG, INFO, ERROR).
-        prefix: Optional prefix. If None, attempts to auto-detect from call stack.
-    """
+    """Logs a message with a severity and optional prefix to stdout/stderr and agent.log."""
     if prefix is None:
         try:
             # Auto-detect prefix from caller
@@ -73,10 +68,18 @@ def log_message(message: str, severity: Severity, prefix: Optional[str] = None):
     formatted_message += f" [{AGENT_VERSION}]"
     formatted_message += f" {message}"
 
-    if severity == Severity.ERROR:
-        print(formatted_message, file=sys.stderr)
+    # Centralized log to file
+    try:
+        log_file = os.path.join(os.getcwd(), "agent.log")
+        with open(log_file, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {formatted_message}\n")
+    except Exception:
+        pass
+
+    if severity == Severity.ERROR or os.environ.get("VERBOSE_MODE") == "True":
+        print(formatted_message, file=sys.stderr, flush=True)
     else:
-        print(formatted_message, file=sys.stdout)
+        print(formatted_message, file=sys.stdout, flush=True)
 
 from google.genai import types
 
@@ -121,7 +124,11 @@ def log_status(message: str, tool_context: Optional[ToolContext] = None):
         message: The status message to display in the UI.
         tool_context: Optional ToolContext to update the UI state.
     """
-    print(f"ui:status_update {message}", flush=True)
+    if os.environ.get("VERBOSE_MODE") == "True":
+        print(f"ui:status_update {message}", file=sys.stderr, flush=True)
+    else:
+        print(f"ui:status_update {message}", flush=True)
+
     if tool_context:
         tool_context.state[CONTEXT_UI_PREFIX] = message
 

@@ -13,7 +13,8 @@ If short-form vertical content (Shorts, Reels, LinkedIn Video) is requested, fol
 1. **Always** optimize for mobile-first, vertical viewing experiences.
 2. **Always** Provide the user with the full range of options
   - The substyle for the short (e.g., The Advisor POV, The Professional With-Me, The Market Speedrun, Institutional Insight Share, Financial Mythbuster).
-  - The art and voiceover style choices available to the agent.
+  - The visual style option: Option 1: Brand-Approved Identity (Use preconfigured characters and style references) OR Option 2: Custom Aesthetic (Choose a new style from the menu).
+  - The voiceover style choices available to the agent.
   - Video should be animated by default, but the user can choose to have it be static with a voiceover instead.
 3. **Always** prioritize clarity, data accuracy, and professional authority over aggressive "viral" tropes. 
 

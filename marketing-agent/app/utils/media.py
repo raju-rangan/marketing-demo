@@ -18,22 +18,15 @@ import tempfile
 import time
 from typing import Optional
 import shutil
-import logging
-from enum import Enum
+import sys
 
 import imageio_ffmpeg
-
 import re
 from PIL import Image
 import io
 
-class Severity(Enum):
-    INFO = logging.INFO
-    WARNING = logging.WARNING
-    ERROR = logging.ERROR
+from app.adk_common.utils.utils_logging import log_message, Severity
 
-def log_message(msg: str, severity: Severity = Severity.INFO):
-    logging.log(severity.value, msg)
 
 # FFmpeg / FFprobe path discovery using imageio-ffmpeg
 try:
@@ -51,6 +44,28 @@ if not FFPROBE_EXE:
     else:
         # We will use FFMPEG_EXE as a fallback for FFPROBE_EXE tasks in our code
         FFPROBE_EXE = None
+
+def get_font_path() -> str:
+    """Returns a valid font path for drawtext, optimized for macOS."""
+    paths = [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", # Linux
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return ""
+
+def escape_ffmpeg_text(text: str) -> str:
+    """Escapes special characters for FFmpeg's drawtext filter."""
+    if not text: return ""
+    # Replace single backslash with four (FFmpeg requirement)
+    text = text.replace("\\", "\\\\\\\\")
+    # Escape single quotes, colons, and percent signs
+    text = text.replace("'", "'\\\\\\''").replace(":", "\\:").replace("%", "\\%")
+    return text
 
 def get_video_duration(video_path: str) -> float:
     """Gets duration of a video or audio file using ffprobe or ffmpeg fallback."""
@@ -180,10 +195,12 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
     if not voiceover_bytes and not music_bytes:
         return video_bytes
 
+    log_message("Entering mix_audio_onto_video", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input_video.mp4")
         with open(video_path, "wb") as f:
             f.write(video_bytes)
+        log_message(f"Input video written to {video_path}", Severity.INFO)
 
         has_orig_audio = has_audio(video_path)
         log_message(f"Mixing audio. Original audio exists: {has_orig_audio}", Severity.INFO)
@@ -241,18 +258,33 @@ def mix_audio_onto_video(video_bytes: bytes, voiceover_bytes: bytes | None,
 
         try:
             log_message(f"Running ffmpeg mix: {' '.join(cmd)}", Severity.INFO)
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Added timeout to detect if this is indeed where the process stalls
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+            log_message("Audio mixing completed successfully", Severity.INFO)
+            
+            if not os.path.exists(output_path):
+                log_message(f"Error: Output file {output_path} not found after mixing", Severity.ERROR)
+                return video_bytes
+                
+            file_size = os.path.getsize(output_path)
+            log_message(f"Reading output file {output_path} ({file_size} bytes)", Severity.INFO)
+            
             with open(output_path, "rb") as f:
-                return f.read()
+                data = f.read()
+                log_message(f"Read {len(data)} bytes successfully", Severity.INFO)
+                return data
+        except subprocess.TimeoutExpired:
+            log_message("Audio mixing timed out (120s)", Severity.ERROR)
+            return video_bytes
         except subprocess.CalledProcessError as e:
             err_msg = e.stderr.decode() if e.stderr else str(e)
             log_message(f"Audio mixing failed: {err_msg}", Severity.ERROR)
             return video_bytes
         except Exception as e:
-            log_message(f"Audio mixing failed: {e}", Severity.ERROR)
+            log_message(f"Audio mixing error: {e}", Severity.ERROR)
             return video_bytes
 
-def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.0) -> bytes:
+def overlay_logo_on_video(video_bytes: bytes, logo_bytes: bytes, opacity: float = 0.7) -> bytes:
     """Overlays a logo in the bottom-right corner of the video."""
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")
@@ -315,31 +347,39 @@ def overlay_logo_on_image(image_bytes: bytes, logo_bytes: bytes, position: str =
 def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video_duration: float,
                       product_name: str = "", price: str = "", acts: Optional[list[dict]] = None, clip_sec: int = 8) -> bytes:
     """Adds cinematic text overlays at specific timestamps, including voiceover captions."""
+    log_message("Entering add_text_overlays", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         v_in = os.path.join(tmpdir, "in.mp4")
         v_out = os.path.join(tmpdir, "out.mp4")
         with open(v_in, "wb") as f: f.write(video_bytes)
+        log_message(f"Input video written to {v_in}", Severity.INFO)
 
         # Drawtext filters for Company (top left), Tagline (bottom center), and Price (top right)
         filters = []
+        font_path = get_font_path()
+        log_message(f"Using font path: {font_path}", Severity.INFO)
+        font_str = f":fontfile='{font_path}'" if font_path else ""
         
         # Company Name (appears at 1s, fades in)
+        safe_company = escape_ffmpeg_text(company_name)
         filters.append(
-            f"drawtext=text='{company_name}':fontcolor=white:fontsize=48:x=40:y=40:"
+            f"drawtext=text='{safe_company}':fontcolor=white:fontsize=48:x=40:y=40{font_str}:"
             f"enable='between(t,1,{video_duration})':alpha='if(lt(t,2),t-1,1)'"
         )
         
         # Product Name (bottom left)
         if product_name:
+            safe_product = escape_ffmpeg_text(product_name)
             filters.append(
-                f"drawtext=text='{product_name}':fontcolor=white:fontsize=36:x=40:y=h-80:"
+                f"drawtext=text='{safe_product}':fontcolor=white:fontsize=36:x=40:y=h-80{font_str}:"
                 f"enable='between(t,2,{video_duration})'"
             )
 
         # Tagline (center, appears later)
         if tagline:
+            safe_tagline = escape_ffmpeg_text(tagline)
             filters.append(
-                f"drawtext=text='{tagline}':fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2+100:"
+                f"drawtext=text='{safe_tagline}':fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2+100{font_str}:"
                 f"enable='between(t,4,{video_duration})':alpha='if(lt(t,5),t-4,1)'"
             )
 
@@ -350,20 +390,39 @@ def add_text_overlays(video_bytes: bytes, company_name: str, tagline: str, video
         ]
         try:
             if not filters: return video_bytes
-            subprocess.run(cmd, check=True, capture_output=True)
+            log_message(f"Running text overlay: {' '.join(cmd)}", Severity.INFO)
+            # Use subprocess.run with timeout to prevent infinite stalls
+            result = subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            log_message("FFmpeg text overlay completed successfully", Severity.INFO)
+            if not os.path.exists(v_out):
+                log_message(f"Error: Output file {v_out} not found after text overlay", Severity.ERROR)
+                return video_bytes
+                
             with open(v_out, "rb") as f:
                 return f.read()
-        except Exception:
+        except subprocess.TimeoutExpired:
+            log_message("FFmpeg text overlay timed out", Severity.ERROR)
+            return video_bytes
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode() if e.stderr else str(e)
+            log_message(f"FFmpeg text overlay failed: {err_msg}", Severity.ERROR)
+            return video_bytes
+        except Exception as e:
+            log_message(f"Text overlay error: {e}", Severity.ERROR)
             return video_bytes
 
 def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, product_price: str = "") -> bytes:
     """Adds a 3-second frozen end-card with a blurred background and call to action."""
+    log_message("Entering add_end_card_overlay", Severity.INFO)
     with tempfile.TemporaryDirectory() as tmpdir:
         v_in = os.path.join(tmpdir, "in.mp4")
         with open(v_in, "wb") as f: f.write(video_bytes)
+        log_message("Input video written to temp for end card", Severity.INFO)
         
         dur = get_video_duration(v_in)
-        if dur <= 0: return video_bytes
+        if dur <= 0: 
+            log_message("Invalid duration for end card, skipping", Severity.WARNING)
+            return video_bytes
 
         v_out = os.path.join(tmpdir, "final_with_endcard.mp4")
         
@@ -384,30 +443,57 @@ def add_end_card_overlay(video_bytes: bytes, company_name: str, tagline: str, pr
         ]
         
         try:
-            subprocess.run(cmd, check=True, capture_output=True)
+            log_message(f"Running end card FFmpeg: {' '.join(cmd)}", Severity.INFO)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            log_message("End card FFmpeg command completed", Severity.INFO)
+            
             # Try to put original audio back and pad with silence
             final_path = os.path.join(tmpdir, "final.mp4")
-            subprocess.run([
+            audio_cmd = [
                 FFMPEG_EXE, "-y", "-i", v_out, "-i", v_in, 
                 "-map", "0:v", "-map", "1:a?", 
                 "-c:v", "copy", "-c:a", "aac", 
                 "-af", "apad", "-shortest", 
                 final_path
-            ], capture_output=True)
+            ]
+            log_message(f"Running audio pad FFmpeg: {' '.join(audio_cmd)}", Severity.INFO)
+            subprocess.run(audio_cmd, check=True, capture_output=True, timeout=60)
+            log_message("Audio pad command completed", Severity.INFO)
             
             p = final_path if os.path.exists(final_path) else v_out
             with open(p, "rb") as f:
                 return f.read()
-        except Exception:
+        except Exception as e:
+            log_message(f"End card overlay failed: {e}", Severity.ERROR)
             return video_bytes
 
-def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9") -> bytes | None:
+def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0, aspect_ratio: str = "16:9", include_text_overlay: bool = False) -> bytes | None:
     """
     Compiles a slidecast video using ffmpeg.
-    ...
     """
     if not slides:
         return None
+
+    def _sanitize_ffmpeg_text(text: str) -> str:
+        """
+        Robustly escapes text for FFmpeg's drawtext filter.
+        FFmpeg parsing is notoriously complex, requiring multiple layers of escaping
+        for colons, quotes, backslashes, and percentage signs.
+        """
+        if not text:
+            return ""
+        # 1. Escape backslashes first so we don't escape our own escapes
+        text = text.replace("\\", "\\\\")
+        # 2. Escape colons (filter delimiter)
+        text = text.replace(":", "\\:")
+        # 3. Escape percentage signs (used for drawtext variables like %{pts})
+        text = text.replace("%", "\\\\%")
+        # 4. Handle single quotes. Inside a ' ' wrapped string in drawtext, 
+        # a literal single quote is represented by placing it outside the quotes, 
+        # or more simply, we use a smart quote to avoid the parser headache entirely
+        # as it provides the cleanest visual output without risking syntax breaks.
+        text = text.replace("'", "’")
+        return text
 
     # Set canvas dimensions based on aspect ratio
     if aspect_ratio == "9:16":
@@ -423,7 +509,6 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
         input_count = 0
 
         for i, slide in enumerate(slides):
-            # ... (same setup code for aud/img/vid paths)
             img_path = os.path.join(tmpdir, f"img_{i}.png")
             vid_path = os.path.join(tmpdir, f"vid_{i}.mp4")
             aud_path = os.path.join(tmpdir, f"aud_{i}.mp3")
@@ -437,7 +522,9 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
             v_idx = input_count
             input_count += 1
-            text = slide.get("text_overlay", "").replace("'", "\\'").replace(":", "\\:")
+            
+            # Use the robust sanitization function
+            text = _sanitize_ffmpeg_text(slide.get("text_overlay", ""))
 
             # Canvas string
             canvas_str = f"scale={canvas_width}:{canvas_height}:force_original_aspect_ratio=decrease,pad={canvas_width}:{canvas_height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
@@ -449,7 +536,10 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
 
                 inputs.extend(["-i", vid_path])
                 if aud_dur > vid_dur:
-                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", img_path])
+                    end_img_path = os.path.join(tmpdir, f"end_img_{i}.png")
+                    end_bytes = slide.get("end_image_bytes") or slide["image_bytes"]
+                    with open(end_img_path, "wb") as f: f.write(end_bytes)
+                    inputs.extend(["-loop", "1", "-t", str(aud_dur - vid_dur), "-i", end_img_path])
                     img_idx = input_count
                     input_count += 1
                     v_filter = (
@@ -463,7 +553,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
                 inputs.extend(["-loop", "1", "-t", str(aud_dur), "-i", img_path])
                 v_filter = f"[{v_idx}:v]{canvas_str},trim=duration={aud_dur},setpts=PTS-STARTPTS,"
 
-            if text:
+            if include_text_overlay and text:
                 v_filter += f"drawtext=text='{text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.6:boxborderw=10,"
 
             v_filter = v_filter.rstrip(",")
@@ -474,7 +564,6 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
             a_idx = input_count
             input_count += 1
             filter_complex.append(f"[{a_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];")
-        # ... (rest of compilation)
 
         # Concat all slides (requires alternating v/a streams [v0][a0][v1][a1])
         concat_streams = "".join([f"[v{i}][a{i}]" for i in range(len(slides))])
@@ -496,7 +585,7 @@ def compile_slidecast_video(slides: list[dict], transition_duration: float = 0.0
             with open(output_path, "rb") as f:
                 return f.read()
         except subprocess.CalledProcessError as e:
-            err_msg = e.stderr.decode() if e.stderr else str(e)
+            err_msg = e.stderr.decode('utf-8', errors='ignore') if e.stderr else str(e)
             print(f"FFMPEG Error details:\n{err_msg}")
             log_message(f"Slidecast compilation failed: {err_msg}", Severity.ERROR)
             return None

@@ -31,6 +31,6 @@ os.environ.setdefault("GOOGLE_CLOUD_LOCATION", os.getenv("GOOGLE_CLOUD_LOCATION"
 os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "True")
 
 # Import the assembled app from the modular factory
-from .agent_factory import app, root_agent
+from app.agent_factory import app, root_agent
 
 __all__ = ["app", "root_agent"]

@@ -71,3 +71,5 @@ coverage.xml
 graphify-out/
 .gemini-workspace/
 marketing-agent/deployment_metadata.json
+a2ui-sample/
+.graphifyignore

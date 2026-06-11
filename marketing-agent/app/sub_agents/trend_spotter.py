@@ -14,18 +14,18 @@
 
 # pylint: disable=C0114, C0115, C0301, W0611, W0613, W0718
 
-from ..adk_common.utils.utils_logging import (
+from app.adk_common.utils.utils_logging import (
     Severity,
     log_function_call,
     log_message,
 )
-from ..adk_common.utils.utils_prompts import load_prompt_file_from_calling_agent
+from app.adk_common.utils.utils_prompts import load_prompt_file_from_calling_agent
 from google import genai
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools import ToolContext
 from google.genai import types as genai_types
-from ..config import LOCATION, PROJECT_ID
-from ..schema import TaxonomyAttributes, Trend, TrendSpotterOutput
+from app.config import LOCATION, PROJECT_ID
+from app.schema import TaxonomyAttributes, Trend, TrendSpotterOutput
 
 
 class TrendSpotter:
